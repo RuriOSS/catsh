@@ -552,3 +552,33 @@ int cth_wait(struct cth_result **res)
 	// TODO
 	return -1;
 }
+int cth_fork_rexec_self(char *const argv[])
+{
+	/*
+	 * Fork and re-exec the current executable with given arguments.
+	 * argv: The arguments to pass to the new executable, NULL-terminated array of strings.
+	 * Returns the exit code of the new process on success, -1 on failure.
+	 * Note: This function will block, and use current terminal for stdio.
+	 */
+	pid_t pid = fork();
+	if (pid == -1) {
+		return -1;
+	}
+	if (pid == 0) {
+		size_t argc = 0;
+		while (argv[argc] != NULL) {
+			argc++;
+		}
+		char **new_argv = malloc(sizeof(char *) * (argc + 2));
+		new_argv[0] = "/proc/self/exe";
+		for (size_t i = 0; i < argc; i++) {
+			new_argv[i + 1] = argv[i];
+		}
+		new_argv[argc + 1] = NULL;
+		execv(new_argv[0], new_argv);
+		return -1;
+	}
+	int status;
+	waitpid(pid, &status, 0);
+	return WEXITSTATUS(status);
+}

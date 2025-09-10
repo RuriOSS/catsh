@@ -79,6 +79,7 @@ int cth_add_arg(char ***argv, char *arg);
 void cth_free_argv(char ***argv);
 void cth_free_result(struct cth_result **res);
 struct cth_result *cth_exec(char **argv, char *input, bool block, bool get_output);
+int cth_fork_rexec_self(char *const argv[]);
 int cth_exec_command(char **argv);
 // TODO: non-blocking exec
 int cth_wait(struct cth_result **res);
