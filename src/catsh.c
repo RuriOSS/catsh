@@ -41,8 +41,9 @@ int cth_add_arg(char ***argv, char *arg)
 	 */
 	size_t argc = 0;
 	if (*argv != NULL) {
-		while ((*argv)[argc] != NULL)
+		while ((*argv)[argc] != NULL) {
 			argc++;
+		}
 	}
 	char **new_argv = realloc(*argv, sizeof(char *) * (argc + 2));
 	if (new_argv == NULL) {
@@ -135,11 +136,12 @@ static struct cth_result *cth_exec_block_without_stdio(char **argv)
 	res->exit_code = -1;
 	res->stdout_ret = NULL;
 	res->stderr_ret = NULL;
-	int status;
+	int status = 0;
 	// Wait for child process, handle EINTR.
 	while (waitpid(pid, &status, 0) < 0) {
-		if (errno == EINTR)
+		if (errno == EINTR) {
 			continue;
+		}
 		free(res);
 		return NULL;
 	}
@@ -201,8 +203,9 @@ static struct cth_result *cth_exec_block(char **argv, char *input, bool get_outp
 	int stdout_pipe[2] = { -1, -1 };
 	int stderr_pipe[2] = { -1, -1 };
 	if (input != NULL) {
-		if (pipe(stdin_pipe) < 0)
+		if (pipe(stdin_pipe) < 0) {
 			return NULL;
+		}
 		// Set write end of stdin pipe to non-blocking.
 		int flags = fcntl(stdin_pipe[1], F_GETFL, 0);
 		if (flags != -1) {
@@ -286,8 +289,9 @@ static struct cth_result *cth_exec_block(char **argv, char *input, bool get_outp
 	}
 	// Parent process.
 	// Close unused pipe ends.
-	if (input != NULL)
+	if (input != NULL) {
 		close(stdin_pipe[0]);
+	}
 	if (get_output) {
 		close(stdout_pipe[1]);
 		close(stderr_pipe[1]);
@@ -300,9 +304,12 @@ static struct cth_result *cth_exec_block(char **argv, char *input, bool get_outp
 	res->stdout_ret = NULL;
 	res->stderr_ret = NULL;
 	// Buffers for stdout and stderr.
-	char *stdout_buf = NULL, *stderr_buf = NULL;
-	size_t stdout_size = 0, stderr_size = 0;
-	size_t stdout_cap = 0, stderr_cap = 0;
+	char *stdout_buf = NULL;
+	char *stderr_buf = NULL;
+	size_t stdout_size = 0;
+	size_t stderr_size = 0;
+	size_t stdout_cap = 0;
+	size_t stderr_cap = 0;
 	size_t BUF_CHUNK = 4096;
 	if (get_output) {
 		BUF_CHUNK = pipe_buf_size(stdout_pipe[0]);
@@ -321,7 +328,9 @@ static struct cth_result *cth_exec_block(char **argv, char *input, bool get_outp
 	// poll loop to handle stdin, stdout, stderr.
 	struct pollfd pfds[3];
 	int nfds = 0;
-	int stdin_idx = -1, stdout_idx = -1, stderr_idx = -1;
+	int stdin_idx = -1;
+	int stdout_idx = -1;
+	int stderr_idx = -1;
 	if (input != NULL) {
 		pfds[nfds].fd = stdin_pipe[1];
 		pfds[nfds].events = POLLOUT;
@@ -336,8 +345,7 @@ static struct cth_result *cth_exec_block(char **argv, char *input, bool get_outp
 		stderr_idx = nfds++;
 	}
 	ssize_t input_written = 0;
-	ssize_t input_len = input ? strlen(input) : 0;
-	int stdin_closed = (input == NULL);
+	ssize_t input_len = input ? (ssize_t)strlen(input) : 0;
 	// Loop until all fds are closed.
 	while (nfds > 0) {
 		int ret = poll(pfds, nfds, -1);
@@ -470,18 +478,18 @@ static struct cth_result *cth_exec_block(char **argv, char *input, bool get_outp
 			stderr_idx = -1;
 		}
 		// Check if all fds are closed.
-		if ((stdin_idx == -1) && (stdout_idx == -1) && (stderr_idx == -1))
+		if ((stdin_idx == -1) && (stdout_idx == -1) && (stderr_idx == -1)) {
 			break;
+		}
 	}
 	// Parent process, wait for child to exit.
-	int status;
+	int status = 0;
 	// Wait for child process, handle EINTR
 	while (waitpid(pid, &status, 0) < 0) {
 		if (errno == EINTR) {
 			continue;
-		} else {
-			break;
 		}
+		break;
 	}
 	res->exited = true;
 	if (WIFEXITED(status)) {
@@ -569,16 +577,17 @@ int cth_fork_rexec_self(char *const argv[])
 		while (argv[argc] != NULL) {
 			argc++;
 		}
-		char **new_argv = malloc(sizeof(char *) * (argc + 2));
+		char **new_argv = (char **)malloc(sizeof(char *) * (argc + 2));
 		new_argv[0] = "/proc/self/exe";
 		for (size_t i = 0; i < argc; i++) {
 			new_argv[i + 1] = argv[i];
 		}
 		new_argv[argc + 1] = NULL;
 		execv(new_argv[0], new_argv);
-		return -1;
+		free(new_argv);
+		_exit(CTH_EXIT_FAILURE);
 	}
-	int status;
+	int status = 0;
 	waitpid(pid, &status, 0);
 	return WEXITSTATUS(status);
 }
