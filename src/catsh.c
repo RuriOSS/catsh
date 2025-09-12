@@ -757,7 +757,7 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 	size_t stderr_size = 0;
 	size_t stdout_cap = 0;
 	size_t stderr_cap = 0;
-	size_t BUF_CHUNK = 1024;
+	size_t BUF_CHUNK = 1024 * 4;
 	char input_buf[BUF_CHUNK + 1];
 	// poll loop to handle stdin, stdout, stderr.
 	struct pollfd pfds[3];
