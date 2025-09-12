@@ -48,5 +48,22 @@ int main(void)
 	} else {
 		printf("  cth_exec failed\n");
 	}
+	mkdir("test_e", 0755);
+	struct cth_result *res2 = cth_exec_with_file_input((char *[]){ "tar", "-xJf", "-", "-C", "./test_e", NULL }, open("rootfs.tar.xz", O_RDONLY), true, true, cth_show_progress, 0);
+	printf("Demo: Extract a tar file using catsh\n");
+	if (res2 != NULL) {
+		printf("  exit code = %d\n", res2->exit_code);
+		if (res2->stdout_ret)
+			printf("  stdout:\n%s", res2->stdout_ret);
+		else
+			printf("  stdout: (null)\n");
+		if (res2->stderr_ret)
+			printf("  stderr:\n%s", res2->stderr_ret);
+		else
+			printf("  stderr: (null)\n");
+		cth_free_result(&res2);
+	} else {
+		printf("  cth_exec_with_file_input failed\n");
+	}
 	return 0;
 }

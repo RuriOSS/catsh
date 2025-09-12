@@ -43,6 +43,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include <poll.h>
+#include <sys/stat.h>
 // Bool!!!
 #if __STDC_VERSION__ < 202000L
 #ifndef bool
@@ -55,7 +56,7 @@
 	do {         \
 		x    \
 	} while (0)
-#define cth_log(...)                                                                                                          \
+#define cth_log(format, ...)                                                                                                  \
 	{                                                                                                                     \
 		struct timeval tv;                                                                                            \
 		gettimeofday(&tv, NULL);                                                                                      \
@@ -84,3 +85,5 @@ int cth_exec_command(char **argv);
 // TODO: non-blocking exec
 int cth_wait(struct cth_result **res);
 void *cth_init_argv(void);
+struct cth_result *cth_exec_with_file_input(char **argv, int fd, bool block, bool get_output, void (*progress)(float, int), int progress_line_num);
+void cth_show_progress(float progress, int line_num);
