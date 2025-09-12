@@ -806,6 +806,10 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 						stdout_cap = stdout_cap ? stdout_cap * 2 : BUF_CHUNK;
 						stdout_buf = realloc(stdout_buf, stdout_cap);
 					}
+					if (stdout_buf == NULL) {
+						// realloc failed
+						break;
+					}
 					memcpy(stdout_buf + stdout_size, stdout_buf + stdout_size, n);
 					stdout_size += n;
 				}
@@ -813,7 +817,7 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 				stdout_idx = -1;
 			}
 			if (get_output && stderr_idx != -1) {
-				ssize_t n;
+				ssize_t n = 0;
 				while ((n = read(stderr_pipe[0], stderr_buf ? stderr_buf + stderr_size : NULL, BUF_CHUNK)) > 0) {
 					if (stderr_cap - stderr_size < (size_t)n) {
 						stderr_cap = stderr_cap ? stderr_cap * 2 : BUF_CHUNK;
@@ -1009,7 +1013,9 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 			res->stderr_ret = stderr_buf;
 		}
 	}
-	progress(-1.0f, progress_line_num);
+	if (progress != NULL) {
+		progress(-1.0, progress_line_num);
+	}
 	return res;
 }
 // API function.
@@ -1053,13 +1059,13 @@ void cth_show_progress(float progress, int line_num)
 	 *           If line_num <= 0, use the current line.
 	 * Note: This function uses ANSI escape codes to move the cursor.
 	 */
-	if (progress < 0.0f) {
+	if (progress < 0.0) {
 		printf("\n");
 		fflush(stdout);
 		return;
 	}
-	if (progress > 1.0f) {
-		progress = 1.0f;
+	if (progress > 1.0) {
+		progress = 1.0;
 	}
 	const int bar_width = 50;
 	int pos = (int)(bar_width * progress);
@@ -1077,7 +1083,7 @@ void cth_show_progress(float progress, int line_num)
 			printf(" ");
 		}
 	}
-	printf("] %3d %%\r", (int)(progress * 100.0f));
+	printf("] %3d %%\r", (int)(progress * 100.0));
 	fflush(stdout);
 	// Move cursor back to original position.
 	if (line_num > 0) {
