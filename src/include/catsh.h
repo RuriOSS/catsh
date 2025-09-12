@@ -66,8 +66,9 @@
 #define CTH_EXIT_FAILURE 114
 #define CTH_EXIT_SUCCESS 0
 #define CTH_VERSION_MAJOR 0
-#define CTH_VERSION_MINOR 0
-#define CTH_VERSION_PATCH 1
+#define CTH_VERSION_MINOR 5
+#define CTH_VERSION_PATCH 0
+#define CTH_VERSION_STRING "0.5.0"
 struct cth_result {
 	bool exited;
 	int exit_code;
