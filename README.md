@@ -1,10 +1,9 @@
 # What's this?
-WIP project, not stable yet.      
 catsh stands for C As Tangled SHell script.      
 A tiny C library to execute shell commands with input/output redirection, implemented in pure C.      
 As I like to use C, and for now I don't want to learn any other language, so I made this. At least C is more strict than shell script, that means less bugs (I hope so).           
-Simple, stupid, paranoid, but I like it.      
-It's planned to be the low-level implemention of rurima, and it's already used as part of rurima.      
+Simple, stupid, paranoid, but I like it.       
+It's the low-level implemention of rurima, and it's already used as part of rurima.      
 # A simple demo:
 ```c
 #include "include/catsh.h"
@@ -43,8 +42,7 @@ Hello, catsh from stdout!
   stderr:
 Hello, catsh from stderr!
 ```
-# Benchmark results:
-~~Now we do have a PPT for it nya~~     
+# Benchmark results: 
 Not very scientific, just a simple test.      
 Tested on Ubuntu 24.04.3 LTS, OrbStack vm, MacBook Air M4.      
 ```
