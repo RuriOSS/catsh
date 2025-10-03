@@ -88,3 +88,7 @@ int cth_wait(struct cth_result **res);
 void *cth_init_argv(void);
 struct cth_result *cth_exec_with_file_input(char **argv, int fd, bool block, bool get_output, void (*progress)(float, int), int progress_line_num);
 void cth_show_progress(float progress, int line_num);
+#define CTH_EXEC_SUCCEED(res) ((res) != NULL && (res)->exited && ((res)->exit_code == 0))
+#define CTH_EXEC_FAILED(res) ((res) != NULL && (res)->exited && ((res)->exit_code != 0))
+#define CTH_EXEC_RUNNING(res) ((res) != NULL && !(res)->exited)
+#define CTH_EXEC_CANNOT_RUN(res) ((res) == NULL)

@@ -33,7 +33,7 @@ int main(void)
 	char *stdin_msg = "Hello, catsh from stdin!\n";
 	struct cth_result *res = cth_exec((char *[]){ "sh", "-c", "cat;echo Hello, catsh from stdout!; echo Hello, catsh from stderr! >&2; exit 0", NULL }, stdin_msg, true, true);
 	printf("Demo: Execute a shell command with input and capture output\n");
-	if (res != NULL) {
+	if (CTH_EXEC_SUCCEED(res)) {
 		printf("  exit code = %d\n", res->exit_code);
 		printf("  stdin(input):\n%s", stdin_msg);
 		if (res->stdout_ret)
@@ -51,7 +51,7 @@ int main(void)
 	mkdir("test_e", 0755);
 	struct cth_result *res2 = cth_exec_with_file_input((char *[]){ "tar", "-xJf", "-", "-C", "./test_e", NULL }, open("rootfs.tar.xz", O_RDONLY), true, true, cth_show_progress, 0);
 	printf("Demo: Extract a tar file using catsh\n");
-	if (res2 != NULL) {
+	if (CTH_EXEC_SUCCEED(res2)) {
 		printf("  exit code = %d\n", res2->exit_code);
 		if (res2->stdout_ret)
 			printf("  stdout:\n%s", res2->stdout_ret);

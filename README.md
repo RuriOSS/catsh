@@ -12,7 +12,7 @@ int main(void)
 	char *stdin_msg = "Hello, catsh from stdin!\n";
 	struct cth_result *res = cth_exec((char *[]){ "sh", "-c", "cat;echo Hello, catsh from stdout!; echo Hello, catsh from stderr! >&2; exit 0", NULL }, stdin_msg, true, true);
 	printf("Demo: Execute a shell command with input and capture output\n");
-	if (res != NULL) {
+	if (CTH_EXEC_SUCCEED(res)) {
 		printf("  exit code = %d\n", res->exit_code);
 		printf("  stdin(input):\n%s", stdin_msg);
 		if (res->stdout_ret)
@@ -25,7 +25,15 @@ int main(void)
 			printf("  stderr: (null)\n");
 		cth_free_result(&res);
 	} else {
-		printf("  cth_exec failed\n");
+		if (CTH_EXEC_FAILED(res)) {
+			printf("  Command exited with code %d\n", res->exit_code);
+			cth_free_result(&res);
+		} else if (CTH_EXEC_RUNNING(res)) {
+			printf("  Command is still running\n");
+			cth_free_result(&res);
+		} else if (CTH_EXEC_CANNOT_RUN(res)) {
+			printf("  Cannot run command\n");
+		}
 	}
 	return 0;
 }
