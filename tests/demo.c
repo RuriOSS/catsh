@@ -44,6 +44,7 @@ int main(void)
 			printf("  stderr:\n%s", res->stderr_ret);
 		else
 			printf("  stderr: (null)\n");
+		printf("  time used = %u microseconds\n", res->time_used);
 		cth_free_result(&res);
 	} else {
 		printf("  cth_exec failed\n");
@@ -61,6 +62,7 @@ int main(void)
 			printf("  stderr:\n%s", res2->stderr_ret);
 		else
 			printf("  stderr: (null)\n");
+		printf("  time used = %u microseconds\n", res2->time_used);
 		cth_free_result(&res2);
 	} else {
 		printf("  cth_exec_with_file_input failed\n");

@@ -76,6 +76,7 @@ struct cth_result {
 	char *stderr_ret;
 	pid_t pid;
 	pid_t ppid;
+	useconds_t time_used;
 };
 int cth_add_arg(char ***argv, char *arg);
 void cth_free_argv(char ***argv);

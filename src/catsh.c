@@ -106,6 +106,8 @@ static struct cth_result *cth_exec_block_without_stdio(char **argv)
 	 * This is the simplest case.
 	 */
 	pid_t pid = fork();
+	struct timeval start_time, end_time;
+	gettimeofday(&start_time, NULL);
 	// Just error handling.
 	if (pid < 0) {
 		return NULL;
@@ -145,6 +147,9 @@ static struct cth_result *cth_exec_block_without_stdio(char **argv)
 		free(res);
 		return NULL;
 	}
+	gettimeofday(&end_time, NULL);
+	// Calculate time used in microseconds.
+	res->time_used = (end_time.tv_sec - start_time.tv_sec) * 1000000 + (end_time.tv_usec - start_time.tv_usec);
 	// Get exit code.
 	res->exited = true;
 	if (WIFEXITED(status)) {
@@ -194,6 +199,8 @@ static struct cth_result *cth_exec_block(char **argv, char *input, bool get_outp
 	 * Returns a cth_result structure on success, NULL on failure.
 	 * The caller is responsible for freeing the result using cth_free_result().
 	 */
+	struct timeval start_time, end_time;
+	gettimeofday(&start_time, NULL);
 	// For the simplest case, just exec without stdio redirection
 	if (input == NULL && !get_output) {
 		return cth_exec_block_without_stdio(argv);
@@ -549,6 +556,9 @@ static struct cth_result *cth_exec_block(char **argv, char *input, bool get_outp
 		}
 		break;
 	}
+	gettimeofday(&end_time, NULL);
+	// Calculate time used in microseconds.
+	res->time_used = (end_time.tv_sec - start_time.tv_sec) * 1000000 + (end_time.tv_usec - start_time.tv_usec);
 	res->exited = true;
 	if (WIFEXITED(status)) {
 		res->exit_code = WEXITSTATUS(status);
@@ -658,6 +668,8 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 	 * get_output: If true, capture stdout and stderr output.
 	 * progress: A callback function to report progress, can be NULL.
 	 */
+	struct timeval start_time, end_time;
+	gettimeofday(&start_time, NULL);
 	if (input_fd < 0) {
 		return NULL;
 	}
@@ -991,6 +1003,9 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 		}
 		break;
 	}
+	gettimeofday(&end_time, NULL);
+	// Calculate time used in microseconds.
+	res->time_used = (end_time.tv_sec - start_time.tv_sec) * 1000000 + (end_time.tv_usec - start_time.tv_usec);
 	res->exited = true;
 	if (WIFEXITED(status)) {
 		res->exit_code = WEXITSTATUS(status);
