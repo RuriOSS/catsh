@@ -83,7 +83,7 @@ struct cth_result {
 	uint8_t reserved[256];
 };
 #define CTH_VERSION ((CTH_VERSION_MAJOR << 16) | (CTH_VERSION_MINOR << 8) | (CTH_VERSION_PATCH))
-#define CTH_ABI_COMPATIBLE(res) ((res) != NULL && (res)->cth_version >= CTH_VERSION && (res)->struct_size == sizeof(struct cth_result))
+#define CTH_ABI_COMPATIBLE(res) ((res) != NULL && (res)->cth_version <= CTH_VERSION && (res)->struct_size == sizeof(struct cth_result))
 int cth_add_arg(char ***argv, char *arg);
 void cth_free_argv(char ***argv);
 void cth_free_result(struct cth_result **res);
