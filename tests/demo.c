@@ -63,6 +63,9 @@ int main(void)
 		else
 			printf("  stderr: (null)\n");
 		printf("  time used = %u microseconds\n", res2->time_used);
+		printf("cth_version: %u\n", res2->cth_version);
+		printf("struct_size: %zu\n", res2->struct_size);
+		printf("ABI compatible: %s\n", CTH_ABI_COMPATIBLE(res2) ? "yes" : "no");
 		cth_free_result(&res2);
 	} else {
 		printf("  cth_exec_with_file_input failed\n");

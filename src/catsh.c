@@ -28,6 +28,28 @@
  *
  */
 #include "include/catsh.h"
+static struct cth_result *cth_new(pid_t pid, pid_t ppid)
+{
+	/*
+	 * Allocate and initialize a new cth_result structure.
+	 * Returns a pointer to the new structure, or NULL on failure.
+	 */
+	struct cth_result *res = malloc(sizeof(struct cth_result));
+	if (res == NULL) {
+		return NULL;
+	}
+	res->exited = false;
+	res->exit_code = -1;
+	res->stdout_ret = NULL;
+	res->stderr_ret = NULL;
+	res->pid = pid;
+	res->ppid = ppid;
+	res->time_used = 0;
+	res->cth_version = CTH_VERSION;
+	res->struct_size = sizeof(struct cth_result);
+	memset(res->reserved, 0, sizeof(res->reserved));
+	return res;
+}
 int cth_add_arg(char ***argv, char *arg)
 {
 	/*
@@ -303,13 +325,18 @@ static struct cth_result *cth_exec_block(char **argv, char *input, bool get_outp
 		close(stdout_pipe[1]);
 		close(stderr_pipe[1]);
 	}
-	struct cth_result *res = malloc(sizeof(struct cth_result));
-	res->pid = pid;
-	res->ppid = -1;
-	res->exited = false;
-	res->exit_code = -1;
-	res->stdout_ret = NULL;
-	res->stderr_ret = NULL;
+	struct cth_result *res = cth_new(pid, -1);
+	if (res == NULL) {
+		// Free pipes
+		if (input != NULL) {
+			close(stdin_pipe[1]);
+		}
+		if (get_output) {
+			close(stdout_pipe[0]);
+			close(stderr_pipe[0]);
+		}
+		return NULL;
+	}
 	// Buffers for stdout and stderr.
 	char *stdout_buf = NULL;
 	char *stderr_buf = NULL;
@@ -755,13 +782,17 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 		close(stdout_pipe[1]);
 		close(stderr_pipe[1]);
 	}
-	struct cth_result *res = malloc(sizeof(struct cth_result));
-	res->pid = pid;
-	res->ppid = -1;
-	res->exited = false;
-	res->exit_code = -1;
-	res->stdout_ret = NULL;
-	res->stderr_ret = NULL;
+	struct cth_result *res = cth_new(pid, -1);
+	if (res == NULL) {
+		// Free pipes
+		close(stdin_pipe[0]);
+		close(stdin_pipe[1]);
+		if (get_output) {
+			close(stdout_pipe[0]);
+			close(stderr_pipe[0]);
+		}
+		return NULL;
+	}
 	// Buffers for stdout and stderr.
 	char *stdout_buf = NULL;
 	char *stderr_buf = NULL;
