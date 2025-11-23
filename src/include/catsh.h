@@ -68,8 +68,8 @@
 #define CTH_EXIT_SUCCESS 0
 #define CTH_VERSION_MAJOR 0
 #define CTH_VERSION_MINOR 6
-#define CTH_VERSION_PATCH 0
-#define CTH_VERSION_STRING "0.6.0"
+#define CTH_VERSION_PATCH 1
+#define CTH_VERSION_STRING "0.6.1"
 struct cth_result {
 	uint32_t cth_version;
 	size_t struct_size;
