@@ -793,6 +793,8 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 		}
 		return NULL;
 	}
+	// Prgoress callback setup
+	float progress_total = 0.0f;
 	// Buffers for stdout and stderr.
 	char *stdout_buf = NULL;
 	char *stderr_buf = NULL;
@@ -899,7 +901,11 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 			break;
 		}
 		if (progress != NULL) {
-			progress((float)input_written / (float)(input_len ? input_len : 1), progress_line_num);
+			float progress_now = (float)input_written / (float)(input_len ? input_len : 1);
+			if (progress_now - 0.005f > progress_total) {
+				progress(progress_now, progress_line_num);
+				progress_total = progress_now;
+			}
 		}
 		// Write to stdin.
 		if (stdin_idx != -1 && (pfds[stdin_idx].revents & POLLOUT)) {
@@ -1022,6 +1028,9 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 		}
 		// Check if all fds are closed.
 		if ((stdin_idx == -1) && (stdout_idx == -1) && (stderr_idx == -1)) {
+			if (progress != NULL) {
+				progress(1.0f, progress_line_num);
+			}
 			break;
 		}
 	}
