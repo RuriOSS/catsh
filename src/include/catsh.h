@@ -70,7 +70,7 @@
 #define CTH_VERSION_MINOR 6
 #define CTH_VERSION_PATCH 1
 #define CTH_VERSION_STRING "0.6.1"
-struct cth_result {
+struct __attribute__((packed, aligned(1))) cth_result {
 	uint32_t cth_version;
 	size_t struct_size;
 	bool exited;
