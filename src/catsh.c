@@ -399,6 +399,11 @@ static struct cth_result *cth_exec_block(char **argv, char *input, bool get_outp
 				while ((n = read(stdout_pipe[0], stdout_buf ? stdout_buf + stdout_size : NULL, BUF_CHUNK)) > 0) {
 					if (stdout_cap - stdout_size < (size_t)n) {
 						stdout_cap = stdout_cap ? stdout_cap * 2 : BUF_CHUNK;
+						// Max to CTH_MAX_OUTPUT_SIZE.
+						if (stdout_cap > CTH_MAX_OUTPUT_SIZE) {
+							stdout_cap = CTH_MAX_OUTPUT_SIZE;
+							stdout_size = 0; // Discard previous data if exceeding max size.
+						}
 						stdout_buf = realloc(stdout_buf, stdout_cap);
 					}
 					memcpy(stdout_buf + stdout_size, stdout_buf + stdout_size, n);
@@ -412,6 +417,11 @@ static struct cth_result *cth_exec_block(char **argv, char *input, bool get_outp
 				while ((n = read(stderr_pipe[0], stderr_buf ? stderr_buf + stderr_size : NULL, BUF_CHUNK)) > 0) {
 					if (stderr_cap - stderr_size < (size_t)n) {
 						stderr_cap = stderr_cap ? stderr_cap * 2 : BUF_CHUNK;
+						// Max to CTH_MAX_OUTPUT_SIZE.
+						if (stderr_cap > CTH_MAX_OUTPUT_SIZE) {
+							stderr_cap = CTH_MAX_OUTPUT_SIZE;
+							stderr_size = 0; // Discard previous data if exceeding max size.
+						}
 						stderr_buf = realloc(stderr_buf, stderr_cap);
 					}
 					memcpy(stderr_buf + stderr_size, stderr_buf + stderr_size, n);
@@ -812,8 +822,8 @@ int cth_wait(struct cth_result **res)
 					size_t stdout_size = 0;
 					size_t BUF_CHUNK = 4096;
 					while (true) {
-						if (stdout_size + BUF_CHUNK > 1024 * 1024 * 128) {
-							// Limit stdout buffer to 128MB, to avoid OOM.
+						if (stdout_size + BUF_CHUNK > CTH_MAX_OUTPUT_SIZE) {
+							// Limit stdout buffer to CTH_MAX_OUTPUT_SIZE.
 							break;
 						}
 						stdout_buf = realloc(stdout_buf, stdout_size + BUF_CHUNK);
@@ -842,8 +852,8 @@ int cth_wait(struct cth_result **res)
 					size_t stderr_size = 0;
 					size_t BUF_CHUNK = 4096;
 					while (true) {
-						if (stderr_size + BUF_CHUNK > 1024 * 1024 * 128) {
-							// Limit stderr buffer to 128MB, to avoid OOM.
+						if (stderr_size + BUF_CHUNK > CTH_MAX_OUTPUT_SIZE) {
+							// Limit stderr buffer to CTH_MAX_OUTPUT_SIZE.
 							break;
 						}
 						stderr_buf = realloc(stderr_buf, stderr_size + BUF_CHUNK);
@@ -1187,6 +1197,11 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 		if (get_output && stdout_idx != -1 && (pfds[stdout_idx].revents & POLLIN)) {
 			if (stdout_cap - stdout_size < BUF_CHUNK) {
 				stdout_cap = stdout_cap ? stdout_cap * 2 : BUF_CHUNK;
+				// Max to CTH_MAX_OUTPUT_SIZE.
+				if (stdout_cap > CTH_MAX_OUTPUT_SIZE) {
+					stdout_cap = CTH_MAX_OUTPUT_SIZE;
+					stdout_size = 0; // Discard previous data if exceeding max size.
+				}
 				stdout_buf = realloc(stdout_buf, stdout_cap);
 			}
 			ssize_t n = read(stdout_pipe[0], stdout_buf + stdout_size, BUF_CHUNK);
@@ -1222,6 +1237,11 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 		if (get_output && stderr_idx != -1 && (pfds[stderr_idx].revents & POLLIN)) {
 			if (stderr_cap - stderr_size < BUF_CHUNK) {
 				stderr_cap = stderr_cap ? stderr_cap * 2 : BUF_CHUNK;
+				// Max to CTH_MAX_OUTPUT_SIZE.
+				if (stderr_cap > CTH_MAX_OUTPUT_SIZE) {
+					stderr_cap = CTH_MAX_OUTPUT_SIZE;
+					stderr_size = 0; // Discard previous data if exceeding max size.
+				}
 				stderr_buf = realloc(stderr_buf, stderr_cap);
 			}
 			ssize_t n = read(stderr_pipe[0], stderr_buf + stderr_size, BUF_CHUNK);
