@@ -622,6 +622,9 @@ static struct cth_result *cth_exec_block(char **argv, char *input, bool get_outp
 static struct cth_result *cth_exec_nonblock(char **argv, char *input, bool get_output)
 {
 	char memfd_name[32];
+	// Never mind, memfd does not really need a unique name, and we will not search it by name as well.
+	// NOLINTBEGIN
+	srand((unsigned int)time(NULL));
 	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_stdout_%d", rand());
 	int stdout_fd = memfd_create(memfd_name, MFD_CLOEXEC);
 	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_stderr_%d", rand());
@@ -630,6 +633,7 @@ static struct cth_result *cth_exec_nonblock(char **argv, char *input, bool get_o
 	int stat_fd = memfd_create(memfd_name, MFD_CLOEXEC);
 	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_pid_%d", rand());
 	int pid_fd = memfd_create(memfd_name, MFD_CLOEXEC);
+	// NOLINTEND
 	if (stdout_fd < 0 || stderr_fd < 0 || stat_fd < 0 || pid_fd < 0) {
 		if (stdout_fd >= 0) {
 			close(stdout_fd);
@@ -1317,6 +1321,9 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 static struct cth_result *cth_exec_nonblock_with_file_input(char **argv, int input_fd, bool get_output, void (*progress)(float, int), int progress_line_num)
 {
 	char memfd_name[32];
+	// Never mind, memfd does not really need a unique name, and we will not search it by name as well.
+	// NOLINTBEGIN
+	srand((unsigned int)time(NULL));
 	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_stdout_%d", rand());
 	int stdout_fd = memfd_create(memfd_name, MFD_CLOEXEC);
 	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_stderr_%d", rand());
@@ -1325,6 +1332,7 @@ static struct cth_result *cth_exec_nonblock_with_file_input(char **argv, int inp
 	int stat_fd = memfd_create(memfd_name, MFD_CLOEXEC);
 	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_pid_%d", rand());
 	int pid_fd = memfd_create(memfd_name, MFD_CLOEXEC);
+	// NOLINTEND
 	if (stdout_fd < 0 || stderr_fd < 0 || stat_fd < 0 || pid_fd < 0) {
 		if (stdout_fd >= 0) {
 			close(stdout_fd);
