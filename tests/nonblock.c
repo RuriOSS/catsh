@@ -56,7 +56,7 @@ void t1()
 		printf("Exit code: %d\n", res->exit_code);
 		printf("Stdout: %s\n", res->stdout_ret ? res->stdout_ret : "(null)");
 		printf("Stderr: %s\n", res->stderr_ret ? res->stderr_ret : "(null)");
-		printf("Time used: %lld microseconds, as %lld s\n", res->time_used, res->time_used / 1000000);
+		printf("Time used: %lld ms, as %lld s\n", res->time_used_ms, res->time_used_ms / 1000);
 	}
 	cth_free_result(&res);
 }
@@ -88,16 +88,19 @@ void t2()
 		printf("Exit code: %d\n", res->exit_code);
 		printf("Stdout: %s\n", res->stdout_ret ? res->stdout_ret : "(null)");
 		printf("Stderr: %s\n", res->stderr_ret ? res->stderr_ret : "(null)");
-		printf("Time used: %lld microseconds, as %lld s\n", res->time_used, res->time_used / 1000000);
+		printf("Time used: %lld ms, as %lld s\n", res->time_used_ms, res->time_used_ms / 1000);
 	}
 	cth_free_result(&res);
 }
 void t3()
 {
-	char *argv[] = { "sh", "-c", "while read x; do echo $x; done", NULL };
+	char *argv[] = { "sh", "-c", "while read x; do echo $x;sleep 0.001; done", NULL };
 	int fd = memfd_create("input", MFD_CLOEXEC);
-	for (int i = 0; i < 1024 * 128; i++) {
-		write(fd, "hello world\n", 12);
+	for (int i = 0; i < 1024; i++) {
+		for (int j = 0; j < 10; j++) {
+			write(fd, "hello world ", 12);
+		}
+		write(fd, "\n", 1);
 	}
 	lseek(fd, 0, SEEK_SET);
 	struct cth_result *res = cth_exec_with_file_input(argv, fd, false, true, cth_show_progress, 0);
@@ -129,7 +132,7 @@ void t3()
 			printf("Stdout: %s\n", res->stdout_ret ? res->stdout_ret : "(null)");
 		}
 		printf("Stderr: %s\n", res->stderr_ret ? res->stderr_ret : "(null)");
-		printf("Time used: %lld microseconds, as %lld s\n", res->time_used, res->time_used / 1000000);
+		printf("Time used: %lld ms, as %lld s\n", res->time_used_ms, res->time_used_ms / 1000);
 	}
 	cth_free_result(&res);
 }

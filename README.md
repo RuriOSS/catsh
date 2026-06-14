@@ -6,7 +6,7 @@ Simple, stupid, paranoid, but I like it.
 It's part of the low-level implemention of rurima.      
 # WIP && Backwords compatibility:
 This library is STILL WIP, but since 0.6.0, struct cth_result and related functions are ABI stable.      
-However, non-blocking process execution is NOT YET supported.      
+Since 0.9.0, non-blocking execution is added, but the old blocking API is still available and unchanged.      
 # A simple demo:
 ```c
 #include "include/catsh.h"

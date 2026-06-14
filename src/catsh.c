@@ -51,6 +51,7 @@ static struct cth_result *cth_new(void)
 	res->stdout_fd = -1;
 	res->stderr_fd = -1;
 	res->time_fd = -1;
+	res->time_used_ms = 0;
 	memset(res->reserved, 0, sizeof(res->reserved));
 	return res;
 }
@@ -171,6 +172,8 @@ static struct cth_result *cth_exec_block_without_stdio(char **argv)
 	gettimeofday(&end_time, NULL);
 	// Calculate time used in microseconds.
 	res->time_used = (end_time.tv_sec - start_time.tv_sec) * 1000000 + (end_time.tv_usec - start_time.tv_usec);
+	// Calculate time used in ms.
+	res->time_used_ms = (end_time.tv_sec - start_time.tv_sec) * 1000 + (end_time.tv_usec - start_time.tv_usec) / 1000;
 	// Get exit code.
 	res->exited = true;
 	if (WIFEXITED(status)) {
@@ -596,6 +599,8 @@ static struct cth_result *cth_exec_block(char **argv, char *input, bool get_outp
 	gettimeofday(&end_time, NULL);
 	// Calculate time used in microseconds.
 	res->time_used = (end_time.tv_sec - start_time.tv_sec) * 1000000 + (end_time.tv_usec - start_time.tv_usec);
+	// Calculate time used in ms.
+	res->time_used_ms = (end_time.tv_sec - start_time.tv_sec) * 1000 + (end_time.tv_usec - start_time.tv_usec) / 1000;
 	res->exited = true;
 	if (WIFEXITED(status)) {
 		res->exit_code = WEXITSTATUS(status);
@@ -765,10 +770,10 @@ static struct cth_result *cth_exec_nonblock(char **argv, char *input, bool get_o
 			buf[tt] = 0;
 		}
 	}
-	char time_used[128];
-	snprintf(time_used, sizeof(time_used), "%lld", (long long)exec_res->time_used);
+	char time_used_ms[128];
+	snprintf(time_used_ms, sizeof(time_used_ms), "%llu", (unsigned long long)exec_res->time_used_ms);
 	lseek(time_fd, 0, SEEK_SET);
-	write(time_fd, time_used, strlen(time_used));
+	write(time_fd, time_used_ms, strlen(time_used_ms));
 	char stat_str[32];
 	snprintf(stat_str, sizeof(stat_str), "%d", exec_res->exit_code);
 	lseek(stat_fd, 0, SEEK_SET);
@@ -840,9 +845,10 @@ int cth_wait(struct cth_result **res)
 					if (tn > 0) {
 						time_buf[tn] = 0;
 						char *endptr;
-						long long time_used = strtoll(time_buf, &endptr, 10);
+						long long time_used_ms = strtoll(time_buf, &endptr, 10);
 						if (endptr != time_buf && *endptr == 0) {
-							r->time_used = (int64_t)time_used;
+							r->time_used_ms = (uint64_t)time_used_ms;
+							r->time_used = r->time_used_ms * 1000; // convert ms to us.
 						}
 					}
 					close(r->time_fd);
@@ -1319,6 +1325,8 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 	gettimeofday(&end_time, NULL);
 	// Calculate time used in microseconds.
 	res->time_used = (end_time.tv_sec - start_time.tv_sec) * 1000000 + (end_time.tv_usec - start_time.tv_usec);
+	// Calculate time used in milliseconds.
+	res->time_used_ms = (end_time.tv_sec - start_time.tv_sec) * 1000 + (end_time.tv_usec - start_time.tv_usec) / 1000;
 	res->exited = true;
 	if (WIFEXITED(status)) {
 		res->exit_code = WEXITSTATUS(status);
@@ -1491,10 +1499,10 @@ static struct cth_result *cth_exec_nonblock_with_file_input(char **argv, int inp
 			buf[tt] = 0;
 		}
 	}
-	char time_used[128];
-	snprintf(time_used, sizeof(time_used), "%lld", (long long)exec_res->time_used);
+	char time_used_ms[128];
+	snprintf(time_used_ms, sizeof(time_used_ms), "%llu", (unsigned long long)exec_res->time_used_ms);
 	lseek(time_fd, 0, SEEK_SET);
-	write(time_fd, time_used, strlen(time_used));
+	write(time_fd, time_used_ms, strlen(time_used_ms));
 	char stat_str[32];
 	snprintf(stat_str, sizeof(stat_str), "%d", exec_res->exit_code);
 	lseek(stat_fd, 0, SEEK_SET);

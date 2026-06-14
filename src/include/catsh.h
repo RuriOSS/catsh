@@ -74,9 +74,9 @@
 #define CTH_EXIT_FAILURE 114
 #define CTH_EXIT_SUCCESS 0
 #define CTH_VERSION_MAJOR 0
-#define CTH_VERSION_MINOR 8
-#define CTH_VERSION_PATCH 2
-#define CTH_VERSION_STRING "0.8.2"
+#define CTH_VERSION_MINOR 9
+#define CTH_VERSION_PATCH 0
+#define CTH_VERSION_STRING "0.9.0"
 // 128 MiB, for output capturing, should be enough for most cases. Can be changed in the future if needed.
 #define CTH_MAX_OUTPUT_SIZE (1024 * 1024 * 128)
 struct __attribute__((packed, aligned(1))) cth_result {
@@ -89,7 +89,7 @@ struct __attribute__((packed, aligned(1))) cth_result {
 	pid_t pid;
 	// Deprecated, always -1.
 	pid_t ppid;
-	// In microseconds.
+	// In microseconds, for more accurate time measurement. Deprecated, use time_used_ms instead.
 	useconds_t time_used;
 	// New sections for non-blocking exec.
 	// Just overuse memfd magic!
@@ -97,8 +97,10 @@ struct __attribute__((packed, aligned(1))) cth_result {
 	int stdout_fd;
 	int stderr_fd;
 	int time_fd;
+	// Time used in milliseconds.
+	uint64_t time_used_ms;
 	// Reserved space for future expansion, should be zeroed.
-	uint8_t reserved[256 - sizeof(int) - sizeof(int) - sizeof(int) - sizeof(int)];
+	uint8_t reserved[256 - sizeof(int) - sizeof(int) - sizeof(int) - sizeof(int) - sizeof(uint64_t)];
 };
 #define CTH_VERSION ((CTH_VERSION_MAJOR << 16) | (CTH_VERSION_MINOR << 8) | (CTH_VERSION_PATCH))
 #define CTH_ABI_COMPATIBLE(res) ((res) != NULL && (res)->cth_version <= CTH_VERSION && (res)->struct_size == sizeof(struct cth_result))
