@@ -4,7 +4,7 @@ A tiny C library to execute shell commands with input/output redirection, implem
 As I like to use C, and for now I don't want to learn any other language, so I made this.   
 Simple, stupid, paranoid, but I like it.       
 It's part of the low-level implemention of rurima.      
-# WIP && Backwords compatibility:
+# WIP && Backward compatibility:
 This library is STILL WIP, but since 0.6.0, struct cth_result and related functions are ABI stable.      
 Since 0.9.0, non-blocking execution is added, but the old blocking API is still available and unchanged.      
 # A simple demo:
