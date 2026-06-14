@@ -56,12 +56,13 @@ void t1()
 		printf("Exit code: %d\n", res->exit_code);
 		printf("Stdout: %s\n", res->stdout_ret ? res->stdout_ret : "(null)");
 		printf("Stderr: %s\n", res->stderr_ret ? res->stderr_ret : "(null)");
+		printf("Time used: %lld microseconds, as %lld s\n", res->time_used, res->time_used / 1000000);
 	}
 	cth_free_result(&res);
 }
 void t2()
 {
-	char *argv[] = { "sh", "-c", "cat >&2;echo hello; sleep 1; echo world >&2; sleep 1; echo done;exit 1", NULL };
+	char *argv[] = { "sh", "-c", "cat >&2;echo hello; sleep 2; echo world >&2; sleep 1; echo done;exit 1", NULL };
 	struct cth_result *res = cth_exec(argv, "hbvjbvwhkwbjf\n", false, true);
 	if (cth_wait(&res) > 0) {
 		printf("Exit code: %d\n", res->exit_code);
@@ -87,6 +88,7 @@ void t2()
 		printf("Exit code: %d\n", res->exit_code);
 		printf("Stdout: %s\n", res->stdout_ret ? res->stdout_ret : "(null)");
 		printf("Stderr: %s\n", res->stderr_ret ? res->stderr_ret : "(null)");
+		printf("Time used: %lld microseconds, as %lld s\n", res->time_used, res->time_used / 1000000);
 	}
 	cth_free_result(&res);
 }
@@ -127,6 +129,7 @@ void t3()
 			printf("Stdout: %s\n", res->stdout_ret ? res->stdout_ret : "(null)");
 		}
 		printf("Stderr: %s\n", res->stderr_ret ? res->stderr_ret : "(null)");
+		printf("Time used: %lld microseconds, as %lld s\n", res->time_used, res->time_used / 1000000);
 	}
 	cth_free_result(&res);
 }

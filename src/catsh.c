@@ -50,6 +50,7 @@ static struct cth_result *cth_new(void)
 	res->stat_fd = -1;
 	res->stdout_fd = -1;
 	res->stderr_fd = -1;
+	res->time_fd = -1;
 	memset(res->reserved, 0, sizeof(res->reserved));
 	return res;
 }
@@ -633,8 +634,10 @@ static struct cth_result *cth_exec_nonblock(char **argv, char *input, bool get_o
 	int stat_fd = memfd_create(memfd_name, MFD_CLOEXEC);
 	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_pid_%d", rand());
 	int pid_fd = memfd_create(memfd_name, MFD_CLOEXEC);
+	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_time_%d", rand());
+	int time_fd = memfd_create(memfd_name, MFD_CLOEXEC);
 	// NOLINTEND
-	if (stdout_fd < 0 || stderr_fd < 0 || stat_fd < 0 || pid_fd < 0) {
+	if (stdout_fd < 0 || stderr_fd < 0 || stat_fd < 0 || pid_fd < 0 || time_fd < 0) {
 		if (stdout_fd >= 0) {
 			close(stdout_fd);
 		}
@@ -643,6 +646,9 @@ static struct cth_result *cth_exec_nonblock(char **argv, char *input, bool get_o
 		}
 		if (stat_fd >= 0) {
 			close(stat_fd);
+		}
+		if (time_fd >= 0) {
+			close(time_fd);
 		}
 		if (pid_fd >= 0) {
 			close(pid_fd);
@@ -659,6 +665,7 @@ static struct cth_result *cth_exec_nonblock(char **argv, char *input, bool get_o
 		res->stat_fd = stat_fd;
 		res->stdout_fd = stdout_fd;
 		res->stderr_fd = stderr_fd;
+		res->time_fd = time_fd;
 		// Wait pid_fd, and get pid.
 		char pid_buf[32];
 		while (true) {
@@ -758,8 +765,13 @@ static struct cth_result *cth_exec_nonblock(char **argv, char *input, bool get_o
 			buf[tt] = 0;
 		}
 	}
+	char time_used[128];
+	snprintf(time_used, sizeof(time_used), "%lld", (long long)exec_res->time_used);
+	lseek(time_fd, 0, SEEK_SET);
+	write(time_fd, time_used, strlen(time_used));
 	char stat_str[32];
 	snprintf(stat_str, sizeof(stat_str), "%d", exec_res->exit_code);
+	lseek(stat_fd, 0, SEEK_SET);
 	write(stat_fd, stat_str, strlen(stat_str));
 	_exit(CTH_EXIT_SUCCESS);
 }
@@ -820,6 +832,21 @@ int cth_wait(struct cth_result **res)
 				r->exit_code = exit_code;
 				r->exited = true;
 				close(r->stat_fd);
+				// read time used from r->time_fd.
+				if (r->time_fd >= 0) {
+					char time_buf[128];
+					lseek(r->time_fd, 0, SEEK_SET);
+					ssize_t tn = read(r->time_fd, time_buf, sizeof(time_buf) - 1);
+					if (tn > 0) {
+						time_buf[tn] = 0;
+						char *endptr;
+						long long time_used = strtoll(time_buf, &endptr, 10);
+						if (endptr != time_buf && *endptr == 0) {
+							r->time_used = (int64_t)time_used;
+						}
+					}
+					close(r->time_fd);
+				}
 				// read stdout and stderr from their fds if needed.
 				if (r->stdout_fd >= 0) {
 					lseek(r->stdout_fd, 0, SEEK_SET);
@@ -1333,8 +1360,10 @@ static struct cth_result *cth_exec_nonblock_with_file_input(char **argv, int inp
 	int stat_fd = memfd_create(memfd_name, MFD_CLOEXEC);
 	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_pid_%d", rand());
 	int pid_fd = memfd_create(memfd_name, MFD_CLOEXEC);
+	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_time_%d", rand());
+	int time_fd = memfd_create(memfd_name, MFD_CLOEXEC);
 	// NOLINTEND
-	if (stdout_fd < 0 || stderr_fd < 0 || stat_fd < 0 || pid_fd < 0) {
+	if (stdout_fd < 0 || stderr_fd < 0 || stat_fd < 0 || pid_fd < 0 || time_fd < 0) {
 		if (stdout_fd >= 0) {
 			close(stdout_fd);
 		}
@@ -1343,6 +1372,9 @@ static struct cth_result *cth_exec_nonblock_with_file_input(char **argv, int inp
 		}
 		if (stat_fd >= 0) {
 			close(stat_fd);
+		}
+		if (time_fd >= 0) {
+			close(time_fd);
 		}
 		if (pid_fd >= 0) {
 			close(pid_fd);
@@ -1359,6 +1391,7 @@ static struct cth_result *cth_exec_nonblock_with_file_input(char **argv, int inp
 		res->stat_fd = stat_fd;
 		res->stdout_fd = stdout_fd;
 		res->stderr_fd = stderr_fd;
+		res->time_fd = time_fd;
 		// Wait pid_fd, and get pid.
 		char pid_buf[32];
 		while (true) {
@@ -1458,8 +1491,13 @@ static struct cth_result *cth_exec_nonblock_with_file_input(char **argv, int inp
 			buf[tt] = 0;
 		}
 	}
+	char time_used[128];
+	snprintf(time_used, sizeof(time_used), "%lld", (long long)exec_res->time_used);
+	lseek(time_fd, 0, SEEK_SET);
+	write(time_fd, time_used, strlen(time_used));
 	char stat_str[32];
 	snprintf(stat_str, sizeof(stat_str), "%d", exec_res->exit_code);
+	lseek(stat_fd, 0, SEEK_SET);
 	write(stat_fd, stat_str, strlen(stat_str));
 	_exit(CTH_EXIT_SUCCESS);
 }
