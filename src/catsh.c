@@ -654,6 +654,7 @@ static struct cth_result *cth_exec_nonblock(char **argv, char *input, bool get_o
 		return NULL;
 	}
 	if (pid > 0) {
+		waitpid(pid, NULL, 0);
 		struct cth_result *res = cth_new();
 		res->stat_fd = stat_fd;
 		res->stdout_fd = stdout_fd;
@@ -1353,6 +1354,7 @@ static struct cth_result *cth_exec_nonblock_with_file_input(char **argv, int inp
 		return NULL;
 	}
 	if (pid > 0) {
+		waitpid(pid, NULL, 0);
 		struct cth_result *res = cth_new();
 		res->stat_fd = stat_fd;
 		res->stdout_fd = stdout_fd;
