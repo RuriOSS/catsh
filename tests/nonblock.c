@@ -90,8 +90,49 @@ void t2()
 	}
 	cth_free_result(&res);
 }
+void t3()
+{
+	char *argv[] = { "sh", "-c", "while read x; do echo $x; done", NULL };
+	int fd = memfd_create("input", MFD_CLOEXEC);
+	for (int i = 0; i < 1024 * 128; i++) {
+		write(fd, "hello world\n", 12);
+	}
+	lseek(fd, 0, SEEK_SET);
+	struct cth_result *res = cth_exec_with_file_input(argv, fd, false, true, cth_show_progress, 0);
+	if (cth_wait(&res) > 0) {
+		printf("Exit code: %d\n", res->exit_code);
+		printf("Stdout: %s\n", res->stdout_ret ? res->stdout_ret : "(null)");
+		printf("Stderr: %s\n", res->stderr_ret ? res->stderr_ret : "(null)");
+	} else {
+		while (cth_wait(&res) < 0) {
+			printf("Waiting for process to exit...\n");
+			if (CTH_EXEC_RUNNING(res)) {
+				printf("Process is still running...\n");
+			} else {
+				printf("Process is not running, but not exited yet...\n");
+			}
+			sleep(1);
+		}
+		if (CTH_EXEC_SUCCEED(res)) {
+			printf("Process exited successfully.\n");
+		} else if (CTH_EXEC_FAILED(res)) {
+			printf("Process exited with failure.\n");
+		} else {
+			printf("Process exited with unknown status.\n");
+		}
+		printf("Exit code: %d\n", res->exit_code);
+		if (strlen(res->stdout_ret) > 100) {
+			printf("Stdout: (too long to display, length: %zu)\n", strlen(res->stdout_ret));
+		} else {
+			printf("Stdout: %s\n", res->stdout_ret ? res->stdout_ret : "(null)");
+		}
+		printf("Stderr: %s\n", res->stderr_ret ? res->stderr_ret : "(null)");
+	}
+	cth_free_result(&res);
+}
 int main()
 {
+	t3();
 	t1();
 	t2();
 }

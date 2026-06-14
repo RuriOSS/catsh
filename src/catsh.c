@@ -1316,8 +1316,142 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 }
 static struct cth_result *cth_exec_nonblock_with_file_input(char **argv, int input_fd, bool get_output, void (*progress)(float, int), int progress_line_num)
 {
-	// TODO:
-	return NULL;
+	char memfd_name[32];
+	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_stdout_%d", rand());
+	int stdout_fd = memfd_create(memfd_name, MFD_CLOEXEC);
+	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_stderr_%d", rand());
+	int stderr_fd = memfd_create(memfd_name, MFD_CLOEXEC);
+	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_stat_%d", rand());
+	int stat_fd = memfd_create(memfd_name, MFD_CLOEXEC);
+	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_pid_%d", rand());
+	int pid_fd = memfd_create(memfd_name, MFD_CLOEXEC);
+	if (stdout_fd < 0 || stderr_fd < 0 || stat_fd < 0 || pid_fd < 0) {
+		if (stdout_fd >= 0) {
+			close(stdout_fd);
+		}
+		if (stderr_fd >= 0) {
+			close(stderr_fd);
+		}
+		if (stat_fd >= 0) {
+			close(stat_fd);
+		}
+		if (pid_fd >= 0) {
+			close(pid_fd);
+		}
+		return NULL;
+	}
+	pid_t pid = fork();
+	if (pid < 0) {
+		return NULL;
+	}
+	if (pid > 0) {
+		struct cth_result *res = cth_new();
+		res->stat_fd = stat_fd;
+		res->stdout_fd = stdout_fd;
+		res->stderr_fd = stderr_fd;
+		// Wait pid_fd, and get pid.
+		char pid_buf[32];
+		while (true) {
+			lseek(pid_fd, 0, SEEK_SET);
+			ssize_t n = read(pid_fd, pid_buf, sizeof(pid_buf) - 1);
+			if (n > 0) {
+				pid_buf[n] = 0;
+				char *endptr;
+				res->pid = (pid_t)strtoul(pid_buf, &endptr, 10);
+				if (endptr == pid_buf || *endptr != 0) {
+					// Invalid pid, treat as error.
+					close(pid_fd);
+					close(stat_fd);
+					close(stdout_fd);
+					close(stderr_fd);
+					free(res);
+					return NULL;
+				}
+				break;
+			} else if ((n < 0 && errno == EINTR) || n == 0) {
+				continue;
+			} else if (n < 0) {
+				// error, give up.
+				close(pid_fd);
+				close(stat_fd);
+				close(stdout_fd);
+				close(stderr_fd);
+				free(res);
+				return NULL;
+			}
+		}
+		close(pid_fd);
+		return res;
+	}
+	pid_t exec_pid = fork();
+	if (exec_pid < 0) {
+		write(pid_fd, "CTH_ERROR", 9);
+		_exit(CTH_EXIT_FAILURE);
+	}
+	if (exec_pid > 0) {
+		_exit(CTH_EXIT_SUCCESS);
+	}
+	char pid_str[32];
+	snprintf(pid_str, sizeof(pid_str), "%d", getpid());
+	write(pid_fd, pid_str, strlen(pid_str));
+	struct cth_result *exec_res = cth_exec_block_with_file_input(argv, input_fd, get_output, progress, progress_line_num);
+	if (exec_res == NULL) {
+		write(stat_fd, "CTH_ERROR", 9);
+		_exit(CTH_EXIT_FAILURE);
+	}
+	if (get_output) {
+		if (exec_res->stdout_ret) {
+			lseek(stdout_fd, 0, SEEK_SET);
+			// Buffered write to stdout_fd, as the output can be large.
+			size_t total_written = 0;
+			size_t to_write = strlen(exec_res->stdout_ret);
+			while (total_written < to_write) {
+				ssize_t n = write(stdout_fd, exec_res->stdout_ret + total_written, to_write - total_written);
+				if (n > 0) {
+					total_written += n;
+				} else if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+					// write buffer full, wait for it to be available.
+					struct pollfd pfd;
+					pfd.fd = stdout_fd;
+					pfd.events = POLLOUT;
+					poll(&pfd, 1, -1);
+				} else {
+					// error, give up writing.
+					break;
+				}
+			}
+		}
+		if (exec_res->stderr_ret) {
+			lseek(stderr_fd, 0, SEEK_SET);
+			// Buffered write to stderr_fd, as the output can be large.
+			size_t total_written = 0;
+			size_t to_write = strlen(exec_res->stderr_ret);
+			while (total_written < to_write) {
+				ssize_t n = write(stderr_fd, exec_res->stderr_ret + total_written, to_write - total_written);
+				if (n > 0) {
+					total_written += n;
+				} else if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+					// write buffer full, wait for it to be available.
+					struct pollfd pfd;
+					pfd.fd = stderr_fd;
+					pfd.events = POLLOUT;
+					poll(&pfd, 1, -1);
+				} else {
+					// error, give up writing.
+					break;
+				}
+			}
+			// Read from stderr_fd to make sure the data is consumed by parent process, to avoid child process being blocked on write.
+			char buf[1024];
+			lseek(stderr_fd, 0, SEEK_SET);
+			int tt = read(stderr_fd, buf, sizeof(buf));
+			buf[tt] = 0;
+		}
+	}
+	char stat_str[32];
+	snprintf(stat_str, sizeof(stat_str), "%d", exec_res->exit_code);
+	write(stat_fd, stat_str, strlen(stat_str));
+	_exit(CTH_EXIT_SUCCESS);
 }
 // API function.
 struct cth_result *cth_exec_with_file_input(char **argv, int fd, bool block, bool get_output, void (*progress)(float, int), int progress_line_num)

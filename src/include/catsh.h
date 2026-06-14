@@ -73,9 +73,9 @@
 #define CTH_EXIT_FAILURE 114
 #define CTH_EXIT_SUCCESS 0
 #define CTH_VERSION_MAJOR 0
-#define CTH_VERSION_MINOR 7
-#define CTH_VERSION_PATCH 1
-#define CTH_VERSION_STRING "0.7.1"
+#define CTH_VERSION_MINOR 8
+#define CTH_VERSION_PATCH 0
+#define CTH_VERSION_STRING "0.8.0"
 // 128 MiB, for output capturing, should be enough for most cases. Can be changed in the future if needed.
 #define CTH_MAX_OUTPUT_SIZE (1024 * 1024 * 128)
 struct __attribute__((packed, aligned(1))) cth_result {
