@@ -213,418 +213,7 @@ static size_t pipe_buf_size(int fd)
 	}
 	return (size_t)size;
 }
-static struct cth_result *cth_exec_block(char **argv, char *input, bool get_output)
-{
-	/*
-	 * Exec the command in blocking mode, with optional stdin input and stdout/stderr capture.
-	 * argv: The command and its arguments, NULL-terminated array of strings.
-	 * input: The input to be passed to the command's stdin, can be NULL.
-	 * get_output: If true, capture stdout and stderr output.
-	 * Returns a cth_result structure on success, NULL on failure.
-	 * The caller is responsible for freeing the result using cth_free_result().
-	 */
-	struct timeval start_time, end_time;
-	gettimeofday(&start_time, NULL);
-	// For the simplest case, just exec without stdio redirection
-	if (input == NULL && !get_output) {
-		return cth_exec_block_without_stdio(argv);
-	}
-	// Create pipes for stdin, stdout, stderr.
-	int stdin_pipe[2] = { -1, -1 };
-	int stdout_pipe[2] = { -1, -1 };
-	int stderr_pipe[2] = { -1, -1 };
-	if (input != NULL) {
-		if (pipe(stdin_pipe) < 0) {
-			return NULL;
-		}
-		// Set write end of stdin pipe to non-blocking.
-		int flags = fcntl(stdin_pipe[1], F_GETFL, 0);
-		if (flags != -1) {
-			fcntl(stdin_pipe[1], F_SETFL, flags | O_NONBLOCK);
-		}
-	}
-	if (get_output) {
-		if (pipe(stdout_pipe) < 0) {
-			if (stdin_pipe[0] != -1) {
-				close(stdin_pipe[0]);
-				close(stdin_pipe[1]);
-			}
-			return NULL;
-		}
-		if (pipe(stderr_pipe) < 0) {
-			if (stdin_pipe[0] != -1) {
-				close(stdin_pipe[0]);
-				close(stdin_pipe[1]);
-			}
-			if (stdout_pipe[0] != -1) {
-				close(stdout_pipe[0]);
-				close(stdout_pipe[1]);
-			}
-			return NULL;
-		}
-	}
-	pid_t pid = fork();
-	// Error handling.
-	if (pid < 0) {
-		if (stdin_pipe[0] != -1) {
-			close(stdin_pipe[0]);
-			close(stdin_pipe[1]);
-		}
-		if (stdout_pipe[0] != -1) {
-			close(stdout_pipe[0]);
-			close(stdout_pipe[1]);
-		}
-		if (stderr_pipe[0] != -1) {
-			close(stderr_pipe[0]);
-			close(stderr_pipe[1]);
-		}
-		return NULL;
-	}
-	if (pid == 0) {
-		// Child process.
-		if (input != NULL) {
-			close(stdin_pipe[1]);
-			dup2(stdin_pipe[0], STDIN_FILENO);
-			close(stdin_pipe[0]);
-		} else {
-			int fd = open("/dev/null", O_RDONLY);
-			if (fd >= 0) {
-				dup2(fd, STDIN_FILENO);
-				if (fd > 2) {
-					close(fd);
-				}
-			}
-		}
-		if (get_output) {
-			close(stdout_pipe[0]);
-			dup2(stdout_pipe[1], STDOUT_FILENO);
-			close(stdout_pipe[1]);
-			close(stderr_pipe[0]);
-			dup2(stderr_pipe[1], STDERR_FILENO);
-			close(stderr_pipe[1]);
-		} else {
-			int fd = open("/dev/null", O_WRONLY);
-			if (fd >= 0) {
-				dup2(fd, STDOUT_FILENO);
-				dup2(fd, STDERR_FILENO);
-				if (fd > 2) {
-					close(fd);
-				}
-			}
-		}
-		execvp(argv[0], argv);
-		close(STDIN_FILENO);
-		close(STDOUT_FILENO);
-		close(STDERR_FILENO);
-		_exit(CTH_EXIT_FAILURE);
-	}
-	// Parent process.
-	// Close unused pipe ends.
-	if (input != NULL) {
-		close(stdin_pipe[0]);
-	}
-	if (get_output) {
-		close(stdout_pipe[1]);
-		close(stderr_pipe[1]);
-	}
-	struct cth_result *res = cth_new();
-	res->pid = pid;
-	if (res == NULL) {
-		// Free pipes
-		if (input != NULL) {
-			close(stdin_pipe[1]);
-		}
-		if (get_output) {
-			close(stdout_pipe[0]);
-			close(stderr_pipe[0]);
-		}
-		return NULL;
-	}
-	// Buffers for stdout and stderr.
-	char *stdout_buf = NULL;
-	char *stderr_buf = NULL;
-	size_t stdout_size = 0;
-	size_t stderr_size = 0;
-	size_t stdout_cap = 0;
-	size_t stderr_cap = 0;
-	size_t BUF_CHUNK = 4096;
-	if (get_output) {
-		BUF_CHUNK = pipe_buf_size(stdout_pipe[0]);
-		BUF_CHUNK = BUF_CHUNK > 0 ? BUF_CHUNK : 4096;
-		size_t BUF_CHUNK_NEW = pipe_buf_size(stderr_pipe[0]);
-		if (BUF_CHUNK_NEW > 0 && BUF_CHUNK_NEW < BUF_CHUNK) {
-			BUF_CHUNK = BUF_CHUNK_NEW;
-		}
-	}
-	if (input != NULL) {
-		size_t BUF_CHUNK_NEW = pipe_buf_size(stdin_pipe[1]);
-		if (BUF_CHUNK_NEW > 0 && BUF_CHUNK_NEW < BUF_CHUNK) {
-			BUF_CHUNK = BUF_CHUNK_NEW;
-		}
-	}
-	// poll loop to handle stdin, stdout, stderr.
-	struct pollfd pfds[3];
-	int nfds = 0;
-	int stdin_idx = -1;
-	int stdout_idx = -1;
-	int stderr_idx = -1;
-	if (input != NULL) {
-		pfds[nfds].fd = stdin_pipe[1];
-		pfds[nfds].events = POLLOUT;
-		stdin_idx = nfds++;
-	}
-	if (get_output) {
-		pfds[nfds].fd = stdout_pipe[0];
-		pfds[nfds].events = POLLIN;
-		stdout_idx = nfds++;
-		pfds[nfds].fd = stderr_pipe[0];
-		pfds[nfds].events = POLLIN;
-		stderr_idx = nfds++;
-	}
-	ssize_t input_written = 0;
-	ssize_t input_len = input ? (ssize_t)strlen(input) : 0;
-	// Loop until all fds are closed.
-	while (nfds > 0) {
-		// Check if child exited before poll
-		int status = 0;
-		pid_t wait_ret = waitpid(pid, &status, WNOHANG);
-		if (wait_ret == pid) {
-			res->exited = true;
-			if (WIFEXITED(status)) {
-				res->exit_code = WEXITSTATUS(status);
-			} else if (WIFSIGNALED(status)) {
-				res->exit_code = 128 + WTERMSIG(status);
-			} else {
-				res->exit_code = -1;
-			}
-			// Continue reading stdout/stderr
-			if (get_output && stdout_idx != -1) {
-				ssize_t n;
-				while ((n = read(stdout_pipe[0], stdout_buf ? stdout_buf + stdout_size : NULL, BUF_CHUNK)) > 0) {
-					if (stdout_cap - stdout_size < (size_t)n) {
-						stdout_cap = stdout_cap ? stdout_cap * 2 : BUF_CHUNK;
-						// Max to CTH_MAX_OUTPUT_SIZE.
-						if (stdout_cap > CTH_MAX_OUTPUT_SIZE) {
-							stdout_cap = CTH_MAX_OUTPUT_SIZE;
-							stdout_size = 0; // Discard previous data if exceeding max size.
-						}
-						stdout_buf = realloc(stdout_buf, stdout_cap);
-					}
-					memcpy(stdout_buf + stdout_size, stdout_buf + stdout_size, n);
-					stdout_size += n;
-				}
-				close(stdout_pipe[0]);
-				stdout_idx = -1;
-			}
-			if (get_output && stderr_idx != -1) {
-				ssize_t n;
-				while ((n = read(stderr_pipe[0], stderr_buf ? stderr_buf + stderr_size : NULL, BUF_CHUNK)) > 0) {
-					if (stderr_cap - stderr_size < (size_t)n) {
-						stderr_cap = stderr_cap ? stderr_cap * 2 : BUF_CHUNK;
-						// Max to CTH_MAX_OUTPUT_SIZE.
-						if (stderr_cap > CTH_MAX_OUTPUT_SIZE) {
-							stderr_cap = CTH_MAX_OUTPUT_SIZE;
-							stderr_size = 0; // Discard previous data if exceeding max size.
-						}
-						stderr_buf = realloc(stderr_buf, stderr_cap);
-					}
-					memcpy(stderr_buf + stderr_size, stderr_buf + stderr_size, n);
-					stderr_size += n;
-				}
-				close(stderr_pipe[0]);
-				stderr_idx = -1;
-			}
-			if (input != NULL && stdin_idx != -1) {
-				close(stdin_pipe[1]);
-				stdin_idx = -1;
-			}
-			// Set output buffers to result (if any data was read)
-			if (get_output) {
-				if (stdout_buf) {
-					stdout_buf = realloc(stdout_buf, stdout_size + 1);
-					stdout_buf[stdout_size] = 0;
-					res->stdout_ret = stdout_buf;
-				}
-				if (stderr_buf) {
-					stderr_buf = realloc(stderr_buf, stderr_size + 1);
-					stderr_buf[stderr_size] = 0;
-					res->stderr_ret = stderr_buf;
-				}
-			}
-			return res;
-		}
-		int ret = poll(pfds, nfds, -1);
-		if (ret < 0 && errno == EINTR) {
-			continue;
-		}
-		if (ret < 0) {
-			break;
-		}
-		// Write to stdin.
-		if (input != NULL && stdin_idx != -1 && (pfds[stdin_idx].revents & POLLOUT)) {
-			size_t remain = input_len - input_written;
-			size_t chunk = remain > BUF_CHUNK ? BUF_CHUNK : remain;
-			ssize_t n = write(stdin_pipe[1], input + input_written, chunk);
-			if (n > 0) {
-				input_written += n;
-				if (input_written >= input_len) {
-					close(stdin_pipe[1]);
-					// remove stdin_idx from pfds.
-					for (int i = stdin_idx + 1; i < nfds; ++i) {
-						pfds[i - 1] = pfds[i];
-					}
-					nfds--;
-					// update indexes.
-					if (stdout_idx > stdin_idx) {
-						stdout_idx--;
-					}
-					if (stderr_idx > stdin_idx) {
-						stderr_idx--;
-					}
-					stdin_idx = -1;
-				}
-			} else if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-				// write buffer full, skip this round, wait for next poll.
-				continue;
-			} else {
-				close(stdin_pipe[1]);
-				// remove stdin_idx from pfds.
-				for (int i = stdin_idx + 1; i < nfds; ++i) {
-					pfds[i - 1] = pfds[i];
-				}
-				nfds--;
-				if (stdout_idx > stdin_idx) {
-					stdout_idx--;
-				}
-				if (stderr_idx > stdin_idx) {
-					stderr_idx--;
-				}
-				stdin_idx = -1;
-			}
-		}
-		// POLLHUP or POLLERR for stdin.
-		if (input != NULL && stdin_idx != -1 && (pfds[stdin_idx].revents & (POLLHUP | POLLERR))) {
-			close(stdin_pipe[1]);
-			// remove stdin_idx from pfds.
-			for (int i = stdin_idx + 1; i < nfds; ++i) {
-				pfds[i - 1] = pfds[i];
-			}
-			nfds--;
-			if (stdout_idx > stdin_idx) {
-				stdout_idx--;
-			}
-			if (stderr_idx > stdin_idx) {
-				stderr_idx--;
-			}
-			stdin_idx = -1;
-		}
-		// Read from stdout.
-		if (get_output && stdout_idx != -1 && (pfds[stdout_idx].revents & POLLIN)) {
-			if (stdout_cap - stdout_size < BUF_CHUNK) {
-				stdout_cap = stdout_cap ? stdout_cap * 2 : BUF_CHUNK;
-				stdout_buf = realloc(stdout_buf, stdout_cap);
-			}
-			ssize_t n = read(stdout_pipe[0], stdout_buf + stdout_size, BUF_CHUNK);
-			if (n > 0) {
-				stdout_size += n;
-			} else {
-				close(stdout_pipe[0]);
-				// remove stdout_idx from pfds.
-				for (int i = stdout_idx + 1; i < nfds; ++i) {
-					pfds[i - 1] = pfds[i];
-				}
-				nfds--;
-				if (stderr_idx > stdout_idx) {
-					stderr_idx--;
-				}
-				stdout_idx = -1;
-			}
-		}
-		// POLLHUP or POLLERR for stdout.
-		if (get_output && stdout_idx != -1 && (pfds[stdout_idx].revents & (POLLHUP | POLLERR))) {
-			close(stdout_pipe[0]);
-			// remove stdout_idx from pfds.
-			for (int i = stdout_idx + 1; i < nfds; ++i) {
-				pfds[i - 1] = pfds[i];
-			}
-			nfds--;
-			if (stderr_idx > stdout_idx) {
-				stderr_idx--;
-			}
-			stdout_idx = -1;
-		}
-		// Read from stderr.
-		if (get_output && stderr_idx != -1 && (pfds[stderr_idx].revents & POLLIN)) {
-			if (stderr_cap - stderr_size < BUF_CHUNK) {
-				stderr_cap = stderr_cap ? stderr_cap * 2 : BUF_CHUNK;
-				stderr_buf = realloc(stderr_buf, stderr_cap);
-			}
-			ssize_t n = read(stderr_pipe[0], stderr_buf + stderr_size, BUF_CHUNK);
-			if (n > 0) {
-				stderr_size += n;
-			} else {
-				close(stderr_pipe[0]);
-				// remove stderr_idx from pfds.
-				for (int i = stderr_idx + 1; i < nfds; ++i) {
-					pfds[i - 1] = pfds[i];
-				}
-				nfds--;
-				stderr_idx = -1;
-			}
-		}
-		// POLLHUP or POLLERR for stderr.
-		if (get_output && stderr_idx != -1 && (pfds[stderr_idx].revents & (POLLHUP | POLLERR))) {
-			close(stderr_pipe[0]);
-			// remove stderr_idx from pfds.
-			for (int i = stderr_idx + 1; i < nfds; ++i) {
-				pfds[i - 1] = pfds[i];
-			}
-			nfds--;
-			stderr_idx = -1;
-		}
-		// Check if all fds are closed.
-		if ((stdin_idx == -1) && (stdout_idx == -1) && (stderr_idx == -1)) {
-			break;
-		}
-	}
-	// Parent process, wait for child to exit.
-	int status = 0;
-	// Wait for child process, handle EINTR
-	while (waitpid(pid, &status, 0) < 0) {
-		if (errno == EINTR) {
-			continue;
-		}
-		break;
-	}
-	gettimeofday(&end_time, NULL);
-	// Calculate time used in microseconds.
-	res->time_used = (end_time.tv_sec - start_time.tv_sec) * 1000000 + (end_time.tv_usec - start_time.tv_usec);
-	// Calculate time used in ms.
-	res->time_used_ms = (end_time.tv_sec - start_time.tv_sec) * 1000 + (end_time.tv_usec - start_time.tv_usec) / 1000;
-	res->exited = true;
-	if (WIFEXITED(status)) {
-		res->exit_code = WEXITSTATUS(status);
-	} else if (WIFSIGNALED(status)) {
-		res->exit_code = 128 + WTERMSIG(status);
-	} else {
-		res->exit_code = -1;
-	}
-	// Set output buffers to result.
-	if (get_output) {
-		// Make sure buffers are null-terminated.
-		if (stdout_buf) {
-			stdout_buf = realloc(stdout_buf, stdout_size + 1);
-			stdout_buf[stdout_size] = 0;
-			res->stdout_ret = stdout_buf;
-		}
-		if (stderr_buf) {
-			stderr_buf = realloc(stderr_buf, stderr_size + 1);
-			stderr_buf[stderr_size] = 0;
-			res->stderr_ret = stderr_buf;
-		}
-	}
-	return res;
-}
+static struct cth_result *cth_exec_block(char **argv, char *input, bool get_output);
 static struct cth_result *cth_exec_nonblock(char **argv, char *input, bool get_output)
 {
 	char memfd_name[32];
@@ -1351,6 +940,38 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 	}
 	if (progress != NULL) {
 		progress(-1.0, progress_line_num);
+	}
+	return res;
+}
+static struct cth_result *cth_exec_block(char **argv, char *input, bool get_output)
+{
+	/*
+	 * Exec the command in blocking mode, with optional stdin input and stdout/stderr capture.
+	 * argv: The command and its arguments, NULL-terminated array of strings.
+	 * input: The input to be passed to the command's stdin, can be NULL.
+	 * get_output: If true, capture stdout and stderr output.
+	 * Returns a cth_result structure on success, NULL on failure.
+	 * The caller is responsible for freeing the result using cth_free_result().
+	 */
+	struct timeval start_time, end_time;
+	gettimeofday(&start_time, NULL);
+	// For the simplest case, just exec without stdio redirection
+	if (input == NULL && !get_output) {
+		return cth_exec_block_without_stdio(argv);
+	}
+	// Open input as file, and use cth_exec_block_with_file_input.
+	int input_fd = -1;
+	if (input != NULL) {
+		input_fd = memfd_create("cth_input", MFD_CLOEXEC);
+		if (input_fd < 0) {
+			return NULL;
+		}
+		write(input_fd, input, strlen(input));
+		lseek(input_fd, 0, SEEK_SET);
+	}
+	struct cth_result *res = cth_exec_block_with_file_input(argv, input_fd, get_output, NULL, 0);
+	if (input_fd >= 0) {
+		close(input_fd);
 	}
 	return res;
 }

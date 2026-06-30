@@ -50,7 +50,12 @@ int main(void)
 		printf("  cth_exec failed\n");
 	}
 	mkdir("test_e", 0755);
-	struct cth_result *res2 = cth_exec_with_file_input((char *[]){ "tar", "-xJf", "-", "-C", "./test_e", NULL }, open("rootfs.tar.xz", O_RDONLY), true, true, cth_show_progress, 0);
+	int fd=open("rootfs.tar.xz", O_RDONLY);
+	if(fd<0){
+		printf("Failed to open rootfs.tar.xz\n");
+		return 1;
+	}
+	struct cth_result *res2 = cth_exec_with_file_input((char *[]){ "tar", "-xJf", "-", "-C", "./test_e", NULL }, fd, true, true, cth_show_progress, 0);
 	printf("Demo: Extract a tar file using catsh\n");
 	if (CTH_EXEC_SUCCEED(res2)) {
 		printf("  exit code = %d\n", res2->exit_code);
