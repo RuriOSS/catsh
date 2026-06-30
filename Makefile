@@ -2,7 +2,7 @@ all:
 	cc tests/test.c src/catsh.c -o test
 	cc tests/test_cat_1.c -o test_cat_1
 	cc tests/test_cat_2.c -o test_cat_2
-	cc -fsanitize=address,undefined tests/demo.c src/catsh.c -o demo
+	cc -fsanitize=address,undefined tests/demo.c src/catsh.c -g -O0 -o demo
 	cc -fsanitize=address,undefined -g -O0 tests/nonblock.c src/catsh.c -o nonblock
 format:
 	clang-format -i src/include/*.h src/*.c tests/*.c

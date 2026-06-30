@@ -751,8 +751,9 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 			}
 			return res;
 		}
-		int ret = poll(pfds, nfds, -1);
-		if (ret < 0 && errno == EINTR) {
+		// 0.3s timeout for poll, to check child exit status.
+		int ret = poll(pfds, nfds, 300);
+		if (ret < 0 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)) {
 			continue;
 		}
 		if (ret < 0) {

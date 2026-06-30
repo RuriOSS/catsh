@@ -50,8 +50,8 @@ int main(void)
 		printf("  cth_exec failed\n");
 	}
 	mkdir("test_e", 0755);
-	int fd=open("rootfs.tar.xz", O_RDONLY);
-	if(fd<0){
+	int fd = open("rootfs.tar.xz", O_RDONLY);
+	if (fd < 0) {
 		printf("Failed to open rootfs.tar.xz\n");
 		return 1;
 	}
@@ -74,6 +74,7 @@ int main(void)
 		cth_free_result(&res2);
 	} else {
 		printf("  cth_exec_with_file_input failed\n");
+		cth_free_result(&res2);
 	}
 	return 0;
 }
