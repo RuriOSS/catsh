@@ -669,6 +669,7 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 			}
 		}
 	}
+	progress(1.0f, progress_line_num);
 	close(stdin_pipe[1]);
 	close(stdin_pipe[0]);
 	// Parent process, wait for child to exit.
