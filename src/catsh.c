@@ -969,6 +969,12 @@ static struct cth_result *cth_exec_block(char **argv, char *input, bool get_outp
 		}
 		write(input_fd, input, strlen(input));
 		lseek(input_fd, 0, SEEK_SET);
+	} else {
+		// Get an empty memfd for input.
+		input_fd = memfd_create("cth_input_empty", MFD_CLOEXEC);
+		if (input_fd < 0) {
+			return NULL;
+		}
 	}
 	struct cth_result *res = cth_exec_block_with_file_input(argv, input_fd, get_output, NULL, 0);
 	if (input_fd >= 0) {
