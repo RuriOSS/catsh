@@ -850,6 +850,24 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 		}
 		// POLLHUP or POLLERR for stdout.
 		if (get_output && stdout_idx != -1 && (pfds[stdout_idx].revents & (POLLHUP | POLLERR))) {
+			// Read any remaining data from stdout before closing.
+			while (true) {
+				if (stdout_cap - stdout_size < BUF_CHUNK) {
+					stdout_cap = stdout_cap ? stdout_cap * 2 : BUF_CHUNK;
+					// Max to CTH_MAX_OUTPUT_SIZE.
+					if (stdout_cap > CTH_MAX_OUTPUT_SIZE) {
+						stdout_cap = CTH_MAX_OUTPUT_SIZE;
+						stdout_size = 0; // Discard previous data if exceeding max size.
+					}
+					stdout_buf = realloc(stdout_buf, stdout_cap);
+				}
+				ssize_t n = read(stdout_pipe[0], stdout_buf + stdout_size, BUF_CHUNK);
+				if (n > 0) {
+					stdout_size += n;
+				} else {
+					break;
+				}
+			}
 			close(stdout_pipe[0]);
 			// remove stdout_idx from pfds.
 			for (int i = stdout_idx + 1; i < nfds; ++i) {
@@ -887,6 +905,24 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 		}
 		// POLLHUP or POLLERR for stderr.
 		if (get_output && stderr_idx != -1 && (pfds[stderr_idx].revents & (POLLHUP | POLLERR))) {
+			// Read any remaining data from stderr before closing.
+			while (true) {
+				if (stderr_cap - stderr_size < BUF_CHUNK) {
+					stderr_cap = stderr_cap ? stderr_cap * 2 : BUF_CHUNK;
+					// Max to CTH_MAX_OUTPUT_SIZE.
+					if (stderr_cap > CTH_MAX_OUTPUT_SIZE) {
+						stderr_cap = CTH_MAX_OUTPUT_SIZE;
+						stderr_size = 0; // Discard previous data if exceeding max size.
+					}
+					stderr_buf = realloc(stderr_buf, stderr_cap);
+				}
+				ssize_t n = read(stderr_pipe[0], stderr_buf + stderr_size, BUF_CHUNK);
+				if (n > 0) {
+					stderr_size += n;
+				} else {
+					break;
+				}
+			}
 			close(stderr_pipe[0]);
 			// remove stderr_idx from pfds.
 			for (int i = stderr_idx + 1; i < nfds; ++i) {
