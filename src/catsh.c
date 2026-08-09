@@ -510,6 +510,16 @@ int cth_wait(struct cth_result **res)
 			r->exit_code = -1;
 		}
 	}
+	if (r->exited) {
+		if (r->stdout_ret && !strlen(r->stdout_ret)) {
+			free(r->stdout_ret);
+			r->stdout_ret = NULL;
+		}
+		if (r->stderr_ret && !strlen(r->stderr_ret)) {
+			free(r->stderr_ret);
+			r->stderr_ret = NULL;
+		}
+	}
 	return r->exit_code;
 }
 int cth_fork_rexec_self(char *const argv[])
@@ -754,6 +764,14 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 	}
 	if (progress != NULL) {
 		progress(-1.0, progress_line_num);
+	}
+	if (res->stdout_ret && !strlen(res->stdout_ret)) {
+		free(res->stdout_ret);
+		res->stdout_ret = NULL;
+	}
+	if (res->stderr_ret && !strlen(res->stderr_ret)) {
+		free(res->stderr_ret);
+		res->stderr_ret = NULL;
 	}
 	return res;
 }
