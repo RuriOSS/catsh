@@ -709,11 +709,13 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 				// Limit stdout buffer to CTH_MAX_OUTPUT_SIZE.
 				break;
 			}
-			char buf[BUF_CHUNK];
-			ssize_t n = read(stdout_fd, buf, sizeof(buf));
+			char buf[BUF_CHUNK + 1];
+			buf[0] = 0;
+			ssize_t n = read(stdout_fd, buf, BUF_CHUNK);
 			if (n <= 0) {
 				break;
 			}
+			buf[n] = 0;
 			if (stdout_buf == NULL) {
 				stdout_buf = strdup(buf);
 			} else {
