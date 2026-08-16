@@ -533,7 +533,6 @@ int cth_fork_rexec_self(char *const argv[])
 	}
 	return -1;
 }
-}
 static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_fd, bool get_output, void (*progress)(float, int), int progress_line_num)
 {
 	/*
