@@ -150,7 +150,7 @@ static struct cth_result *cth_exec_block_without_stdio(char **argv)
 		exit(CTH_EXIT_FAILURE);
 	}
 	// Parent process, wait for child to exit.
-	struct cth_result *res = malloc(sizeof(struct cth_result));
+	struct cth_result *res = cth_new();
 	if (res == NULL) {
 		return NULL;
 	}
@@ -271,6 +271,7 @@ static struct cth_result *cth_exec_nonblock(char **argv, char *input, bool get_o
 				}
 				break;
 			} else if ((n < 0 && errno == EINTR) || n == 0) {
+				usleep(1000);
 				continue;
 			} else if (n < 0) {
 				// error, give up.
@@ -525,7 +526,13 @@ int cth_fork_rexec_self(char *const argv[])
 	}
 	int status = 0;
 	waitpid(pid, &status, 0);
-	return WEXITSTATUS(status);
+	if (WIFEXITED(status)) {
+		return WEXITSTATUS(status);
+	} else if (WIFSIGNALED(status)) {
+		return 128 + WTERMSIG(status);
+	}
+	return -1;
+}
 }
 static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_fd, bool get_output, void (*progress)(float, int), int progress_line_num)
 {
@@ -605,15 +612,14 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 	// Parent process.
 	close(stdin_pipe[0]);
 	struct cth_result *res = cth_new();
-	res->pid = pid;
 	if (res == NULL) {
 		// Free pipes
-		close(stdin_pipe[0]);
 		close(stdin_pipe[1]);
 		close(stdout_fd);
 		close(stderr_fd);
 		return NULL;
 	}
+	res->pid = pid;
 	// Prgoress callback setup
 	float progress_total = 0.0f;
 	// Get the size of input_fd, if possible.
@@ -703,10 +709,9 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 			if (stdout_buf == NULL) {
 				stdout_buf = strdup(buf);
 			} else {
-				size_t old_len = strlen(stdout_buf);
-				stdout_buf = realloc(stdout_buf, old_len + n + 1);
-				memcpy(stdout_buf + old_len, buf, n);
-				stdout_buf[old_len + n] = 0;
+				stdout_buf = realloc(stdout_buf, stdout_size + n + 1);
+				memcpy(stdout_buf + stdout_size, buf, n);
+				stdout_buf[stdout_size + n] = 0;
 			}
 			stdout_size += n;
 		}
@@ -728,10 +733,9 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 			if (stderr_buf == NULL) {
 				stderr_buf = strdup(buf);
 			} else {
-				size_t old_len = strlen(stderr_buf);
-				stderr_buf = realloc(stderr_buf, old_len + n + 1);
-				memcpy(stderr_buf + old_len, buf, n);
-				stderr_buf[old_len + n] = 0;
+				stderr_buf = realloc(stderr_buf, stderr_size + n + 1);
+				memcpy(stderr_buf + stderr_size, buf, n);
+				stderr_buf[stderr_size + n] = 0;
 			}
 			stderr_size += n;
 		}
@@ -811,6 +815,9 @@ static struct cth_result *cth_exec_nonblock_with_file_input(char **argv, int inp
 		if (pid_fd >= 0) {
 			close(pid_fd);
 		}
+		if (time_fd >= 0) {
+			close(time_fd);
+		}
 		return NULL;
 	}
 	pid_t pid = fork();
@@ -844,6 +851,7 @@ static struct cth_result *cth_exec_nonblock_with_file_input(char **argv, int inp
 				}
 				break;
 			} else if ((n < 0 && errno == EINTR) || n == 0) {
+				usleep(1000);
 				continue;
 			} else if (n < 0) {
 				// error, give up.
