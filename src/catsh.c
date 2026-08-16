@@ -216,20 +216,11 @@ static size_t pipe_buf_size(int fd)
 static struct cth_result *cth_exec_block(char **argv, char *input, bool get_output);
 static struct cth_result *cth_exec_nonblock(char **argv, char *input, bool get_output)
 {
-	char memfd_name[32];
-	// Never mind, memfd does not really need a unique name, and we will not search it by name as well.
-	// NOLINTBEGIN
-	srand((unsigned int)time(NULL));
-	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_stdout_%d", rand());
-	int stdout_fd = memfd_create(memfd_name, MFD_CLOEXEC);
-	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_stderr_%d", rand());
-	int stderr_fd = memfd_create(memfd_name, MFD_CLOEXEC);
-	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_stat_%d", rand());
-	int stat_fd = memfd_create(memfd_name, MFD_CLOEXEC);
-	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_pid_%d", rand());
-	int pid_fd = memfd_create(memfd_name, MFD_CLOEXEC);
-	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_time_%d", rand());
-	int time_fd = memfd_create(memfd_name, MFD_CLOEXEC);
+	int stdout_fd = memfd_create("cth_stdout", MFD_CLOEXEC);
+	int stderr_fd = memfd_create("cth_stderr", MFD_CLOEXEC);
+	int stat_fd = memfd_create("cth_stat", MFD_CLOEXEC);
+	int pid_fd = memfd_create("cth_pid", MFD_CLOEXEC);
+	int time_fd = memfd_create("cth_time", MFD_CLOEXEC);
 	// NOLINTEND
 	if (stdout_fd < 0 || stderr_fd < 0 || stat_fd < 0 || pid_fd < 0 || time_fd < 0) {
 		if (stdout_fd >= 0) {
@@ -320,12 +311,6 @@ static struct cth_result *cth_exec_nonblock(char **argv, char *input, bool get_o
 				ssize_t n = write(stdout_fd, exec_res->stdout_ret + total_written, to_write - total_written);
 				if (n > 0) {
 					total_written += n;
-				} else if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-					// write buffer full, wait for it to be available.
-					struct pollfd pfd;
-					pfd.fd = stdout_fd;
-					pfd.events = POLLOUT;
-					poll(&pfd, 1, -1);
 				} else {
 					// error, give up writing.
 					break;
@@ -341,22 +326,11 @@ static struct cth_result *cth_exec_nonblock(char **argv, char *input, bool get_o
 				ssize_t n = write(stderr_fd, exec_res->stderr_ret + total_written, to_write - total_written);
 				if (n > 0) {
 					total_written += n;
-				} else if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-					// write buffer full, wait for it to be available.
-					struct pollfd pfd;
-					pfd.fd = stderr_fd;
-					pfd.events = POLLOUT;
-					poll(&pfd, 1, -1);
 				} else {
 					// error, give up writing.
 					break;
 				}
 			}
-			// Read from stderr_fd to make sure the data is consumed by parent process, to avoid child process being blocked on write.
-			char buf[1024];
-			lseek(stderr_fd, 0, SEEK_SET);
-			int tt = read(stderr_fd, buf, sizeof(buf) - 1);
-			buf[tt] = 0;
 		}
 	}
 	char time_used_ms[128];
@@ -816,21 +790,11 @@ static struct cth_result *cth_exec_block(char **argv, char *input, bool get_outp
 }
 static struct cth_result *cth_exec_nonblock_with_file_input(char **argv, int input_fd, bool get_output, void (*progress)(float, int), int progress_line_num)
 {
-	char memfd_name[32];
-	// Never mind, memfd does not really need a unique name, and we will not search it by name as well.
-	// NOLINTBEGIN
-	srand((unsigned int)time(NULL));
-	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_stdout_%d", rand());
-	int stdout_fd = memfd_create(memfd_name, MFD_CLOEXEC);
-	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_stderr_%d", rand());
-	int stderr_fd = memfd_create(memfd_name, MFD_CLOEXEC);
-	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_stat_%d", rand());
-	int stat_fd = memfd_create(memfd_name, MFD_CLOEXEC);
-	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_pid_%d", rand());
-	int pid_fd = memfd_create(memfd_name, MFD_CLOEXEC);
-	snprintf(memfd_name, sizeof(memfd_name), "cth_memfd_time_%d", rand());
-	int time_fd = memfd_create(memfd_name, MFD_CLOEXEC);
-	// NOLINTEND
+	int stdout_fd = memfd_create("cth_stdout", MFD_CLOEXEC);
+	int stderr_fd = memfd_create("cth_stderr", MFD_CLOEXEC);
+	int stat_fd = memfd_create("cth_stat", MFD_CLOEXEC);
+	int pid_fd = memfd_create("cth_pid", MFD_CLOEXEC);
+	int time_fd = memfd_create("cth_time", MFD_CLOEXEC);
 	if (stdout_fd < 0 || stderr_fd < 0 || stat_fd < 0 || pid_fd < 0 || time_fd < 0) {
 		if (stdout_fd >= 0) {
 			close(stdout_fd);
@@ -920,12 +884,6 @@ static struct cth_result *cth_exec_nonblock_with_file_input(char **argv, int inp
 				ssize_t n = write(stdout_fd, exec_res->stdout_ret + total_written, to_write - total_written);
 				if (n > 0) {
 					total_written += n;
-				} else if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-					// write buffer full, wait for it to be available.
-					struct pollfd pfd;
-					pfd.fd = stdout_fd;
-					pfd.events = POLLOUT;
-					poll(&pfd, 1, -1);
 				} else {
 					// error, give up writing.
 					break;
@@ -941,22 +899,11 @@ static struct cth_result *cth_exec_nonblock_with_file_input(char **argv, int inp
 				ssize_t n = write(stderr_fd, exec_res->stderr_ret + total_written, to_write - total_written);
 				if (n > 0) {
 					total_written += n;
-				} else if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-					// write buffer full, wait for it to be available.
-					struct pollfd pfd;
-					pfd.fd = stderr_fd;
-					pfd.events = POLLOUT;
-					poll(&pfd, 1, -1);
 				} else {
 					// error, give up writing.
 					break;
 				}
 			}
-			// Read from stderr_fd to make sure the data is consumed by parent process, to avoid child process being blocked on write.
-			char buf[1024];
-			lseek(stderr_fd, 0, SEEK_SET);
-			int tt = read(stderr_fd, buf, sizeof(buf) - 1);
-			buf[tt] = 0;
 		}
 	}
 	char time_used_ms[128];
