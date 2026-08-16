@@ -355,7 +355,7 @@ static struct cth_result *cth_exec_nonblock(char **argv, char *input, bool get_o
 			// Read from stderr_fd to make sure the data is consumed by parent process, to avoid child process being blocked on write.
 			char buf[1024];
 			lseek(stderr_fd, 0, SEEK_SET);
-			int tt = read(stderr_fd, buf, sizeof(buf));
+			int tt = read(stderr_fd, buf, sizeof(buf) - 1);
 			buf[tt] = 0;
 		}
 	}
@@ -746,10 +746,11 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 				break;
 			}
 			char buf[BUF_CHUNK];
-			ssize_t n = read(stderr_fd, buf, sizeof(buf));
+			ssize_t n = read(stderr_fd, buf, sizeof(buf) - 1);
 			if (n <= 0) {
 				break;
 			}
+			buf[n] = 0;
 			if (stderr_buf == NULL) {
 				stderr_buf = strdup(buf);
 			} else {
@@ -954,7 +955,7 @@ static struct cth_result *cth_exec_nonblock_with_file_input(char **argv, int inp
 			// Read from stderr_fd to make sure the data is consumed by parent process, to avoid child process being blocked on write.
 			char buf[1024];
 			lseek(stderr_fd, 0, SEEK_SET);
-			int tt = read(stderr_fd, buf, sizeof(buf));
+			int tt = read(stderr_fd, buf, sizeof(buf) - 1);
 			buf[tt] = 0;
 		}
 	}
