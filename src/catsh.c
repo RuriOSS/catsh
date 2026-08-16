@@ -646,6 +646,7 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 				}
 				if (written < 0) {
 					if (errno == EAGAIN || errno == EINTR) {
+						usleep(1000);
 						continue;
 					} else {
 						break;
