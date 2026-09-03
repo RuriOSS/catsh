@@ -426,6 +426,7 @@ int cth_wait(struct cth_result **res)
 					while (true) {
 						if (stdout_size + BUF_CHUNK > CTH_MAX_OUTPUT_SIZE) {
 							// Limit stdout buffer to CTH_MAX_OUTPUT_SIZE.
+							r->stdout_len = stdout_size;
 							break;
 						}
 						stdout_buf = realloc(stdout_buf, stdout_size + BUF_CHUNK);
@@ -435,6 +436,7 @@ int cth_wait(struct cth_result **res)
 						} else if (n < 0 && errno == EINTR) {
 							continue;
 						} else {
+							r->stdout_len = stdout_size;
 							break;
 						}
 					}
@@ -442,8 +444,10 @@ int cth_wait(struct cth_result **res)
 						stdout_buf = realloc(stdout_buf, stdout_size + 1);
 						stdout_buf[stdout_size] = 0;
 						r->stdout_ret = stdout_buf;
+						r->stdout_len = stdout_size;
 					} else {
 						r->stdout_ret = NULL;
+						r->stdout_len = 0;
 					}
 					close(r->stdout_fd);
 					r->stdout_fd = -1;
@@ -456,6 +460,7 @@ int cth_wait(struct cth_result **res)
 					while (true) {
 						if (stderr_size + BUF_CHUNK > CTH_MAX_OUTPUT_SIZE) {
 							// Limit stderr buffer to CTH_MAX_OUTPUT_SIZE.
+							r->stderr_len = stderr_size;
 							break;
 						}
 						stderr_buf = realloc(stderr_buf, stderr_size + BUF_CHUNK);
@@ -465,6 +470,7 @@ int cth_wait(struct cth_result **res)
 						} else if (n < 0 && errno == EINTR) {
 							continue;
 						} else {
+							r->stderr_len = stderr_size;
 							break;
 						}
 					}
@@ -472,8 +478,10 @@ int cth_wait(struct cth_result **res)
 						stderr_buf = realloc(stderr_buf, stderr_size + 1);
 						stderr_buf[stderr_size] = 0;
 						r->stderr_ret = stderr_buf;
+						r->stderr_len = stderr_size;
 					} else {
 						r->stderr_ret = NULL;
+						r->stderr_len = 0;
 					}
 					close(r->stderr_fd);
 					r->stderr_fd = -1;
@@ -716,6 +724,7 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 			stdout_size += n;
 		}
 		res->stdout_ret = stdout_buf;
+		res->stdout_len = stdout_size;
 		// Read stderr
 		char *stderr_buf = NULL;
 		size_t stderr_size = 0;
@@ -740,6 +749,7 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 			stderr_size += n;
 		}
 		res->stderr_ret = stderr_buf;
+		res->stderr_len = stderr_size;
 	}
 	if (progress != NULL) {
 		progress(-1.0, progress_line_num);
@@ -747,10 +757,12 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 	if (res->stdout_ret && !strlen(res->stdout_ret)) {
 		free(res->stdout_ret);
 		res->stdout_ret = NULL;
+		res->stdout_len = 0;
 	}
 	if (res->stderr_ret && !strlen(res->stderr_ret)) {
 		free(res->stderr_ret);
 		res->stderr_ret = NULL;
+		res->stderr_len = 0;
 	}
 	return res;
 }

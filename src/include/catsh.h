@@ -99,8 +99,11 @@ struct __attribute__((packed, aligned(1))) cth_result {
 	int time_fd;
 	// Time used in milliseconds.
 	uint64_t time_used_ms;
+	// stderr and stdout length.
+	uint64_t stdout_len;
+	uint64_t stderr_len;
 	// Reserved space for future expansion, should be zeroed.
-	uint8_t reserved[256 - sizeof(int) - sizeof(int) - sizeof(int) - sizeof(int) - sizeof(uint64_t)];
+	uint8_t reserved[256 - sizeof(int) - sizeof(int) - sizeof(int) - sizeof(int) - sizeof(uint64_t) - sizeof(uint64_t) - sizeof(uint64_t)];
 };
 #define CTH_VERSION ((CTH_VERSION_MAJOR << 16) | (CTH_VERSION_MINOR << 8) | (CTH_VERSION_PATCH))
 #define CTH_ABI_COMPATIBLE(res) ((res) != NULL && (res)->cth_version <= CTH_VERSION && (res)->struct_size == sizeof(struct cth_result))
@@ -118,3 +121,4 @@ void cth_show_progress(float progress, int line_num);
 #define CTH_EXEC_FAILED(res) ((res) != NULL && (res)->exited && ((res)->exit_code != 0))
 #define CTH_EXEC_RUNNING(res) ((res) != NULL && !(res)->exited)
 #define CTH_EXEC_CANNOT_RUN(res) ((res) == NULL)
+#define cth_poll(res) cth_wait(res)
