@@ -52,6 +52,8 @@ static struct cth_result *cth_new(void)
 	res->stderr_fd = -1;
 	res->time_fd = -1;
 	res->time_used_ms = 0;
+	res->stdout_len = 0;
+	res->stderr_len = 0;
 	memset(res->reserved, 0, sizeof(res->reserved));
 	return res;
 }
@@ -307,7 +309,7 @@ static struct cth_result *cth_exec_nonblock(char **argv, char *input, bool get_o
 			lseek(stdout_fd, 0, SEEK_SET);
 			// Buffered write to stdout_fd, as the output can be large.
 			size_t total_written = 0;
-			size_t to_write = strlen(exec_res->stdout_ret);
+			size_t to_write = exec_res->stdout_len;
 			while (total_written < to_write) {
 				ssize_t n = write(stdout_fd, exec_res->stdout_ret + total_written, to_write - total_written);
 				if (n > 0) {
@@ -322,7 +324,7 @@ static struct cth_result *cth_exec_nonblock(char **argv, char *input, bool get_o
 			lseek(stderr_fd, 0, SEEK_SET);
 			// Buffered write to stderr_fd, as the output can be large.
 			size_t total_written = 0;
-			size_t to_write = strlen(exec_res->stderr_ret);
+			size_t to_write = exec_res->stderr_len;
 			while (total_written < to_write) {
 				ssize_t n = write(stderr_fd, exec_res->stderr_ret + total_written, to_write - total_written);
 				if (n > 0) {
@@ -494,11 +496,11 @@ int cth_wait(struct cth_result **res)
 		}
 	}
 	if (r->exited) {
-		if (r->stdout_ret && !strlen(r->stdout_ret)) {
+		if (r->stdout_ret && r->stdout_len == 0) {
 			free(r->stdout_ret);
 			r->stdout_ret = NULL;
 		}
-		if (r->stderr_ret && !strlen(r->stderr_ret)) {
+		if (r->stderr_ret && r->stderr_len == 0) {
 			free(r->stderr_ret);
 			r->stderr_ret = NULL;
 		}
@@ -566,10 +568,6 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 		close(stderr_fd);
 		stdout_fd = memfd_create("cth_stdout", MFD_ALLOW_SEALING);
 		stderr_fd = memfd_create("cth_stderr", MFD_ALLOW_SEALING);
-		ftruncate(stdout_fd, CTH_MAX_OUTPUT_SIZE);
-		ftruncate(stderr_fd, CTH_MAX_OUTPUT_SIZE);
-		fcntl(stdout_fd, F_ADD_SEALS, F_SEAL_GROW);
-		fcntl(stderr_fd, F_ADD_SEALS, F_SEAL_GROW);
 	}
 	if (pipe(stdin_pipe) < 0) {
 		return NULL;
@@ -754,12 +752,12 @@ static struct cth_result *cth_exec_block_with_file_input(char **argv, int input_
 	if (progress != NULL) {
 		progress(-1.0, progress_line_num);
 	}
-	if (res->stdout_ret && !strlen(res->stdout_ret)) {
+	if (res->stdout_ret && res->stdout_len == 0) {
 		free(res->stdout_ret);
 		res->stdout_ret = NULL;
 		res->stdout_len = 0;
 	}
-	if (res->stderr_ret && !strlen(res->stderr_ret)) {
+	if (res->stderr_ret && res->stderr_len == 0) {
 		free(res->stderr_ret);
 		res->stderr_ret = NULL;
 		res->stderr_len = 0;
@@ -899,7 +897,7 @@ static struct cth_result *cth_exec_nonblock_with_file_input(char **argv, int inp
 			lseek(stdout_fd, 0, SEEK_SET);
 			// Buffered write to stdout_fd, as the output can be large.
 			size_t total_written = 0;
-			size_t to_write = strlen(exec_res->stdout_ret);
+			size_t to_write = exec_res->stdout_len;
 			while (total_written < to_write) {
 				ssize_t n = write(stdout_fd, exec_res->stdout_ret + total_written, to_write - total_written);
 				if (n > 0) {
@@ -914,7 +912,7 @@ static struct cth_result *cth_exec_nonblock_with_file_input(char **argv, int inp
 			lseek(stderr_fd, 0, SEEK_SET);
 			// Buffered write to stderr_fd, as the output can be large.
 			size_t total_written = 0;
-			size_t to_write = strlen(exec_res->stderr_ret);
+			size_t to_write = exec_res->stderr_len;
 			while (total_written < to_write) {
 				ssize_t n = write(stderr_fd, exec_res->stderr_ret + total_written, to_write - total_written);
 				if (n > 0) {
